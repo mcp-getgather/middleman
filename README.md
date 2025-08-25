@@ -16,3 +16,14 @@ uv sync
 ```
 
 Then open `localhost:3000` and choose one of the examples.
+
+Alternatively, use [Docker](https://docker.com) or [Podman](https://podman.io) to build the container image and run it:
+
+```bash
+docker build -t middleman .
+docker run --rm --name middleman -p 3000:3000 -p 5900:5900 middleman
+```
+
+Then open `localhost:3000` and pick one of the examples.
+
+Open `localhost:3001` to view the containerized desktop live.

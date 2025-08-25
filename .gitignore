@@ -1,3 +1,6 @@
+user-data-dir
+.direnv
+
 # Logs
 logs
 *.log

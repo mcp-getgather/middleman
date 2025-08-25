@@ -1,0 +1,34 @@
+{
+  "name": "middleman",
+  "version": "0.0.1",
+  "description": "",
+  "main": "middleman.js",
+  "scripts": {
+    "start": "node middleman.js",
+    "lint": "oxlint *.js",
+    "test": "npm run check-format",
+    "format-code": "prettier --write \"**/*.{js,jsx,ts,tsx,json,html,css,scss,md}\" \"!{tests,pages}/**\"",
+    "check-format": "prettier --check \"**/*.{js,jsx,ts,tsx,json,html,css,scss,md}\" \"!{tests,pages}/**\"",
+    "postinstall": "npx patchright install chromium"
+  },
+  "license": "MIT",
+  "dependencies": {
+    "@hono/node-server": "~1.14.1",
+    "hono": "~4.7.8",
+    "jsdom": "~26.1.0",
+    "nanoid": "~3.3.11",
+    "patchright": "~1.52.5",
+    "prettier": "~3.5.3"
+  },
+  "prettier": {
+    "printWidth": 120,
+    "semi": true,
+    "singleQuote": true,
+    "tabWidth": 2,
+    "trailingComma": "none",
+    "quoteProps": "consistent"
+  },
+  "devDependencies": {
+    "oxlint": "~1.12.0"
+  }
+}

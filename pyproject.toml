@@ -1,0 +1,49 @@
+[project]
+name = "middleman"
+version = "0.1.0"
+description = "MIDDLEMAN"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "beautifulsoup4>=4.13.4",
+    "fastapi>=0.116.1",
+    "lxml>=6.0.0",
+    "nanoid>=2.0.0",
+    "patchright>=1.52.5",
+    "pwinput>=1.0.3",
+    "python-multipart>=0.0.20",
+    "uvicorn>=0.35.0",
+]
+
+[dependency-groups]
+dev = [
+  "pyright>=1.1.399",
+  "ruff>=0.11.6",
+  "yamlfix>=1.6.1",
+]
+
+[tool.ruff]
+src = ["*.py"]
+exclude = [
+  "**/__pycache__",
+  "**/.pytest_cache",
+  "**/.venv",
+  "**/venv",
+  "**/htmlcov",
+  "**/node_modules",
+  "**/*env/*",
+  "**/.git",
+  "**/*.yaml",
+  "**/*.yml",
+]
+line-length = 120
+preview = true
+
+[tool.ruff.lint.isort]
+combine-as-imports = true
+
+[tool.yamlfix]
+exclude = ["**/.venv/**"]
+explicit_start = false
+line_length = 120
+whitelines = 1

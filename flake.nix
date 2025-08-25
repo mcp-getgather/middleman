@@ -14,6 +14,7 @@
       {
         devShell = pkgs.mkShell {
           buildInputs = [
+            pkgs.uv
             pkgs.nodejs_22
           ];
         };

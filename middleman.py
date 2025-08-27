@@ -324,6 +324,8 @@ async def health() -> dict[str, float | str]:
 @app.get("/", response_class=HTMLResponse)
 async def home():
     examples = [
+        {"title": "NYT Best Sellers", "link": "/start?location=www.nytimes.com/books/best-sellers"},
+        {"title": "Slashdot: Most Discussed", "link": "/start?location=technology.slashdot.org"},
         {"title": "Goodreads Bookshelf", "link": "/start?location=goodreads.com/signin"},
         {"title": "BBC Saved Articles", "link": "/start?location=bbc.com/saved"},
         {"title": "Amazon Browsing History", "link": "/start?location=amazon.com/gp/history"},

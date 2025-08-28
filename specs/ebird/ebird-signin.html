@@ -1,5 +1,11 @@
 <html gg-domain="ebird">
-  <input type="text" gg-match="input#input-user-name" />
-  <input type="password" gg-match="input#input-password" />
-  <input gg-autoclick gg-match="input#form-submit" />
+  <head>
+    <title>Sign In to eBird</title>
+  </head>
+
+  <body>
+    <input autofocus name="username" type="text" gg-match="input#input-user-name" />
+    <input name="password" type="password" gg-match="input#input-password" />
+    <button gg-autoclick gg-match="input#form-submit">Sign in</button>
+  </body>
 </html>

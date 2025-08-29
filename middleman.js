@@ -123,9 +123,9 @@ const locate = async (locator) => {
   }
 };
 
-const click = async (page, selector, timeout = 3 * 1000) => {
+const click = async (page, selector, timeout = 3 * 1000, frame_selector = null) => {
   const LOCATOR_ALL_TIMEOUT = 100; // ms
-  const locator = page.locator(selector);
+  const locator = frame_selector ? page.frameLocator(frame_selector).locator(selector) : page.locator(selector);
   try {
     const elements = await locator.all();
     console.log(`Found ${elements.length} elements for selector "${selector}"`);
@@ -145,7 +145,7 @@ const click = async (page, selector, timeout = 3 * 1000) => {
   } catch (e) {
     if (timeout > 0 && e.constructor.name === 'TimeoutError') {
       console.log('retrying click', selector, timeout);
-      return await click(page, selector, timeout - LOCATOR_ALL_TIMEOUT);
+      return await click(page, selector, timeout - LOCATOR_ALL_TIMEOUT, frame_selector);
     }
     throw e;
   }
@@ -209,7 +209,11 @@ const distill = async (hostname, page, patterns) => {
     for (const target of targets) {
       const html = target.hasAttribute('gg-match-html');
       const selector = html ? target.getAttribute('gg-match-html') : target.getAttribute('gg-match');
-      const source = await locate(page.locator(selector));
+      const frame_selector = target.getAttribute('gg-frame');
+
+      const source = await locate(
+        frame_selector ? page.frameLocator(frame_selector).locator(selector) : page.locator(selector)
+      );
       if (source) {
         if (html) {
           const html = await source.innerHTML();
@@ -263,18 +267,30 @@ const autofill = async (page, distilled, fields) => {
   for (const field of fields) {
     const element = document.querySelector(`input[type=${field}]`);
     const selector = element?.getAttribute('gg-match');
+    const frame_selector = element?.getAttribute('gg-frame');
     if (element && selector) {
       const source = domain ? domain + '_' + field : field;
       const key = source.toUpperCase();
       const value = process.env[key];
       if (value && value.length && value.length > 0) {
         console.log(`${CYAN}${ARROW} Using ${BOLD}${key}${NORMAL} for ${field}${NORMAL}`);
-        await page.fill(selector, value);
+        if (frame_selector) {
+          await page.frameLocator(frame_selector).locator(selector).fill(value);
+        } else {
+          await page.fill(selector, value);
+        }
       } else {
         const placeholder = element.getAttribute('placeholder');
         const prompt = placeholder || `Please enter ${field}`;
         const mask = field === 'password' ? '*' : null;
-        await page.fill(selector, await ask(prompt, mask));
+        if (frame_selector) {
+          await page
+            .frameLocator(frame_selector)
+            .locator(selector)
+            .fill(await ask(prompt, mask));
+        } else {
+          await page.fill(selector, await ask(prompt, mask));
+        }
       }
       await sleep(0.25);
     }
@@ -288,7 +304,8 @@ const autoclick = async (page, distilled) => {
     const selector = button.getAttribute('gg-match');
     if (selector) {
       console.log(`${CYAN}${ARROW} Auto-clicking ${NORMAL}${selector}`);
-      await click(page, selector);
+      const frame_selector = button.getAttribute('gg-frame');
+      await click(page, selector, 3 * 1000, frame_selector);
     }
   }
 };

@@ -1,6 +1,7 @@
 <html gg-domain="agoda" gg-priority="1">
   <body>
     <h2 gg-frame="iframe[title='Universal login']" gg-match="h2:has-text('Sign in with OTP')">Sign in with OTP</h2>
+    <div gg-optional gg-frame="iframe[title='Universal login']" gg-match="div[data-cy='invalid-otp-code']"></div>
     <input
       gg-frame="iframe[title='Universal login']"
       name="otp"

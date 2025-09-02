@@ -348,6 +348,7 @@ async def home():
         {"title": "Amazon Browsing History", "link": "/start?location=amazon.com/gp/history"},
         {"title": "Gofood Order History", "link": "/start?location=gofood.co.id/en/orders"},
         {"title": "eBird Life List", "link": "/start?location=ebird.org/lifelist"},
+        {"title": "Agoda Booking History", "link": "/start?location=agoda.com/account/bookings.html"},
     ]
 
     items = [f'<li><a href="{item["link"]}" target="_blank">{item["title"]}</a></li>' for item in examples]
@@ -442,6 +443,7 @@ async def link(id: str, request: Request):
         for input in inputs:
             if isinstance(input, Tag):
                 selector = input.get("gg-match")
+                frame_selector = input.get("gg-frame")
                 name = input.get("name")
 
                 if selector:
@@ -454,7 +456,10 @@ async def link(id: str, request: Request):
                             print(f"{CYAN}{ARROW} Using form data {BOLD}{name}{NORMAL}")
                             names.append(str(name))
                             input["value"] = str(value)
-                            await page.fill(str(selector), str(value))
+                            if frame_selector:
+                                await page.frame_locator(str(frame_selector)).locator(str(selector)).fill(str(value))
+                            else:
+                                await page.fill(str(selector), str(value))
                             del fields[str(name)]
                             await sleep(0.25)
                         else:

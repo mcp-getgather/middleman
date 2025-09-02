@@ -482,7 +482,8 @@ const render = (content, options = {}) => {
       { title: 'Goodreads Bookshelf', link: '/start?location=goodreads.com/signin' },
       { title: 'BBC Saved Articles', link: '/start?location=bbc.com/saved' },
       { title: 'Amazon Browsing History', link: '/start?location=amazon.com/gp/history' },
-      { title: 'Gofood Order History', link: '/start?location=gofood.co.id/en/orders' }
+      { title: 'Gofood Order History', link: '/start?location=gofood.co.id/en/orders' },
+      { title: 'Agoda Booking History', link: '/start?location=agoda.com/account/bookings.html' }
     ];
 
     const itemize = ({ title, link }) => `<li><a href="${link}" target="_blank">${title}</a></li>`;
@@ -567,6 +568,7 @@ const render = (content, options = {}) => {
       const inputs = document.querySelectorAll('input');
       for (const input of inputs) {
         const selector = input.getAttribute('gg-match');
+        const frame_selector = input.getAttribute('gg-frame');
         const name = input.name;
         if (selector) {
           if (input.type === 'checkbox') {
@@ -578,7 +580,11 @@ const render = (content, options = {}) => {
               console.log(`${CYAN}${ARROW} Using form data ${BOLD}${name}${NORMAL}`);
               names.push(name);
               input.value = value;
-              await page.fill(selector, value);
+              if (frame_selector) {
+                await page.frameLocator(frame_selector).locator(selector).fill(value);
+              } else {
+                await page.fill(selector, value);
+              }
               delete fields[name];
               await sleep(0.25);
             } else {

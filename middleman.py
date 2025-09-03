@@ -3,6 +3,7 @@
 import argparse
 import asyncio
 import os
+import re
 import sys
 import urllib.parse
 from glob import glob
@@ -43,6 +44,14 @@ async def sleep(seconds: float):
 
 async def pause():
     input("Press Enter to continue...")
+
+
+def get_selector(input_selector: str):
+    pattern = r"^(iframe(?:[^\s]*\[[^\]]+\]|[^\s]+))\s+(.+)$"
+    match = re.match(pattern, input_selector)
+    if not match:
+        return input_selector, None
+    return match.group(2), match.group(1)
 
 
 async def ask(message: str, mask: Optional[str] = None) -> str:
@@ -179,12 +188,9 @@ async def distill(hostname: Optional[str], page: Page, patterns: List[Pattern]) 
                 continue
 
             html = target.get("gg-match-html")
-            selector = html if html else target.get("gg-match")
-
+            selector, frame_selector = get_selector(str(html if html else target.get("gg-match")))
             if not selector or not isinstance(selector, str):
                 continue
-
-            frame_selector = target.get("gg-frame")
 
             if frame_selector:
                 source = await locate(page.frame_locator(str(frame_selector)).locator(selector))
@@ -249,8 +255,7 @@ async def autofill(page: Page, distilled: str, fields: List[str]):
         selector = None
         frame_selector = None
         if element:
-            selector = cast(Tag, element).get("gg-match")
-            frame_selector = cast(Tag, element).get("gg-frame")
+            selector, frame_selector = get_selector(str(cast(Tag, element).get("gg-match")))
 
         if element and selector:
             source = f"{domain}_{field}" if domain else field
@@ -280,10 +285,9 @@ async def autoclick(page: Page, distilled: str):
 
     for button in buttons:
         if isinstance(button, Tag):
-            selector = button.get("gg-match")
+            selector, frame_selector = get_selector(str(button.get("gg-match")))
             if selector:
                 print(f"{CYAN}{ARROW} Auto-clicking {NORMAL}{selector}")
-                frame_selector = button.get("gg-frame")
                 if isinstance(frame_selector, list):
                     frame_selector = frame_selector[0] if frame_selector else None
                 await click(page, str(selector), frame_selector=frame_selector)
@@ -444,8 +448,7 @@ async def link(id: str, request: Request):
 
         for input in inputs:
             if isinstance(input, Tag):
-                selector = input.get("gg-match")
-                frame_selector = input.get("gg-frame")
+                selector, frame_selector = get_selector(str(input.get("gg-match")))
                 name = input.get("name")
 
                 if selector:

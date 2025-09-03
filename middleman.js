@@ -43,6 +43,12 @@ const pause = async () => {
   });
 };
 
+const get_selector = (input_selector) => {
+  const match = input_selector.match(/^(iframe(?:[^\s]*\[[^\]]+\]|[^\s]+))\s+(.+)$/);
+  if (!match) return { selector: input_selector, frame_selector: null };
+  return { frame_selector: match[1], selector: match[2] };
+};
+
 const ask = async (message, mask) => {
   const readline = require('readline');
   const rl = readline.createInterface({
@@ -208,8 +214,9 @@ const distill = async (hostname, page, patterns) => {
     const targets = pattern.querySelectorAll('[gg-match], [gg-match-html]');
     for (const target of targets) {
       const html = target.hasAttribute('gg-match-html');
-      const selector = html ? target.getAttribute('gg-match-html') : target.getAttribute('gg-match');
-      const frame_selector = target.getAttribute('gg-frame');
+      const { selector, frame_selector } = get_selector(
+        html ? target.getAttribute('gg-match-html') : target.getAttribute('gg-match')
+      );
 
       const source = await locate(
         frame_selector ? page.frameLocator(frame_selector).locator(selector) : page.locator(selector)
@@ -266,8 +273,7 @@ const autofill = async (page, distilled, fields) => {
 
   for (const field of fields) {
     const element = document.querySelector(`input[type=${field}]`);
-    const selector = element?.getAttribute('gg-match');
-    const frame_selector = element?.getAttribute('gg-frame');
+    const { selector, frame_selector } = get_selector(element?.getAttribute('gg-match'));
     if (element && selector) {
       const source = domain ? domain + '_' + field : field;
       const key = source.toUpperCase();
@@ -301,10 +307,9 @@ const autoclick = async (page, distilled) => {
   const document = parse(distilled);
   const buttons = document.querySelectorAll('[gg-autoclick]');
   for (const button of buttons) {
-    const selector = button.getAttribute('gg-match');
+    const { selector, frame_selector } = get_selector(button.getAttribute('gg-match'));
     if (selector) {
       console.log(`${CYAN}${ARROW} Auto-clicking ${NORMAL}${selector}`);
-      const frame_selector = button.getAttribute('gg-frame');
       await click(page, selector, 3 * 1000, frame_selector);
     }
   }
@@ -567,8 +572,7 @@ const render = (content, options = {}) => {
       const document = parse(distilled);
       const inputs = document.querySelectorAll('input');
       for (const input of inputs) {
-        const selector = input.getAttribute('gg-match');
-        const frame_selector = input.getAttribute('gg-frame');
+        const { selector, frame_selector } = get_selector(input.getAttribute('gg-match'));
         const name = input.name;
         if (selector) {
           if (input.type === 'checkbox') {

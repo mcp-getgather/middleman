@@ -5,7 +5,8 @@
   <body>
     <p gg-match="h1 ~ p"></p>
     <label gg-optional gg-match="label[for=auth-mfa-otpcode]">Enter the code</label>
-    <input autofocus name="otp" type="tel" gg-match="input[type=tel]" />
+    <p gg-optional gg-match="#auth-error-message-box .a-alert-content"></p>
+    <input autofocus name="otp" type="tel" gg-match="input[type=tel]" placeholder="OTP" />
     <button gg-autoclick gg-match="input[type=submit]">Sign in</button>
   </body>
 </html>

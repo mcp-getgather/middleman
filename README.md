@@ -1,5 +1,7 @@
 # MIDDLEMAN
 
+![Screenshot of Middleman](middleman.png)
+
 Use [Docker](https://docker.com) or [Podman](https://podman.io) to pull the container image and run it:
 
 ```bash

@@ -188,7 +188,7 @@ async def distill(hostname: Optional[str], page: Page, patterns: List[Pattern]) 
                 continue
 
             html = target.get("gg-match-html")
-            selector, frame_selector = get_selector(html if html else target.get("gg-match"))
+            selector, frame_selector = get_selector(str(html if html else target.get("gg-match")))
             if not selector or not isinstance(selector, str):
                 continue
 
@@ -255,7 +255,7 @@ async def autofill(page: Page, distilled: str, fields: List[str]):
         selector = None
         frame_selector = None
         if element:
-            selector, frame_selector = get_selector(cast(Tag, element).get("gg-match"))
+            selector, frame_selector = get_selector(str(cast(Tag, element).get("gg-match")))
 
         if element and selector:
             source = f"{domain}_{field}" if domain else field
@@ -285,7 +285,7 @@ async def autoclick(page: Page, distilled: str):
 
     for button in buttons:
         if isinstance(button, Tag):
-            selector, frame_selector = get_selector(button.get("gg-match"))
+            selector, frame_selector = get_selector(str(button.get("gg-match")))
             if selector:
                 print(f"{CYAN}{ARROW} Auto-clicking {NORMAL}{selector}")
                 if isinstance(frame_selector, list):
@@ -448,7 +448,7 @@ async def link(id: str, request: Request):
 
         for input in inputs:
             if isinstance(input, Tag):
-                selector, frame_selector = get_selector(input.get("gg-match"))
+                selector, frame_selector = get_selector(str(input.get("gg-match")))
                 name = input.get("name")
 
                 if selector:

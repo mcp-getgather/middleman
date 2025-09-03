@@ -5,6 +5,7 @@ import asyncio
 import os
 import sys
 import urllib.parse
+from glob import glob
 from typing import Dict, List, Optional, TypedDict, cast
 
 from bs4 import BeautifulSoup
@@ -132,11 +133,10 @@ class Pattern(TypedDict):
 
 def load_patterns() -> List[Pattern]:
     patterns: List[Pattern] = []
-    for name in [f for f in search("./specs") if f.endswith(".html")]:
+    for name in glob("./specs/**/*.html", recursive=True):
         with open(name, "r", encoding="utf-8") as f:
             content = f.read()
-        pattern = parse(content)
-        patterns.append({"name": name, "pattern": pattern})
+        patterns.append(Pattern(name=name, pattern=parse(content)))
     return patterns
 
 
@@ -493,11 +493,11 @@ async def link(id: str, request: Request):
 
 
 async def list_command():
-    spec_files = search("./specs")
+    spec_files = glob("./specs/**/*", recursive=True)
     spec_files = [f for f in spec_files if f.endswith(".html")]
 
     for name in spec_files:
-        print(name.replace("specs/", ""))
+        print(os.path.basename(name))
 
 
 async def distill_command(location: str, option: Optional[str] = None):

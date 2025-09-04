@@ -355,6 +355,7 @@ async def home():
         {"title": "Gofood Order History", "link": "/start?location=gofood.co.id/en/orders"},
         {"title": "eBird Life List", "link": "/start?location=ebird.org/lifelist"},
         {"title": "Agoda Booking History", "link": "/start?location=agoda.com/account/bookings.html"},
+        {"title": "ESPN College Football Schedule", "link": "/start?location=espn.com/college-football/schedule"},
     ]
 
     items = [f'<li><a href="{item["link"]}" target="_blank">{item["title"]}</a></li>' for item in examples]

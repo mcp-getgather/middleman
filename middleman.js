@@ -488,7 +488,8 @@ const render = (content, options = {}) => {
       { title: 'BBC Saved Articles', link: '/start?location=bbc.com/saved' },
       { title: 'Amazon Browsing History', link: '/start?location=amazon.com/gp/history' },
       { title: 'Gofood Order History', link: '/start?location=gofood.co.id/en/orders' },
-      { title: 'Agoda Booking History', link: '/start?location=agoda.com/account/bookings.html' }
+      { title: 'Agoda Booking History', link: '/start?location=agoda.com/account/bookings.html' },
+      { title: 'ESPN College Football Schedule', link: '/start?location=espn.com/college-football/schedule' }
     ];
 
     const itemize = ({ title, link }) => `<li><a href="${link}" target="_blank">${title}</a></li>`;

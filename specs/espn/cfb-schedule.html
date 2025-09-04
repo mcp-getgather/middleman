@@ -1,59 +1,57 @@
 <html gg-domain="espn">
-
-<body>
+  <body>
     <style>
-        /* Hide all complex elements except game matchups */
-        .DatePicker,
-        .dropdown,
-        .Table__TH,
-        .tickets__col,
-        .venue__col,
-        .odds__col,
-        .broadcast__col,
-        .network-container,
-        thead,
-        .Table__Title {
-            display: none;
-        }
+      /* Hide all complex elements except game matchups */
+      .DatePicker,
+      .dropdown,
+      .Table__TH,
+      .tickets__col,
+      .venue__col,
+      .odds__col,
+      .broadcast__col,
+      .network-container,
+      thead,
+      .Table__Title {
+        display: none;
+      }
 
-        /* Simple game list styling */
-        .Table__TR {
-            display: block;
-            margin: 10px 0;
-            padding: 10px;
-            border-bottom: 1px solid #ddd;
-        }
+      /* Simple game list styling */
+      .Table__TR {
+        display: block;
+        margin: 10px 0;
+        padding: 10px;
+        border-bottom: 1px solid #ddd;
+      }
 
-        .Table__Team {
-            font-size: 16px;
-            font-weight: normal;
-        }
+      .Table__Team {
+        font-size: 16px;
+        font-weight: normal;
+      }
 
-        .Table__Team img {
-            width: 20px;
-            height: 20px;
-            margin-right: 5px;
-        }
+      .Table__Team img {
+        width: 20px;
+        height: 20px;
+        margin-right: 5px;
+      }
 
-        .at {
-            margin: 0 5px;
-        }
+      .at {
+        margin: 0 5px;
+      }
 
-        .date__col a {
-            font-size: 14px;
-            color: #666;
-            text-decoration: none;
-        }
+      .date__col a {
+        font-size: 14px;
+        color: #666;
+        text-decoration: none;
+      }
 
-        /* Show only team names and game time */
-        .events__col,
-        .colspan__col,
-        .date__col {
-            display: inline-block;
-            margin-right: 15px;
-        }
+      /* Show only team names and game time */
+      .events__col,
+      .colspan__col,
+      .date__col {
+        display: inline-block;
+        margin-right: 15px;
+      }
     </style>
     <section gg-stop gg-match-html="div[aria-label='Standings Page'] section"></section>
-</body>
-
+  </body>
 </html>

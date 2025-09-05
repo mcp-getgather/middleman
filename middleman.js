@@ -489,7 +489,8 @@ const render = (content, options = {}) => {
       { title: 'Amazon Browsing History', link: '/start?location=amazon.com/gp/history' },
       { title: 'Gofood Order History', link: '/start?location=gofood.co.id/en/orders' },
       { title: 'Agoda Booking History', link: '/start?location=agoda.com/account/bookings.html' },
-      { title: 'ESPN College Football Schedule', link: '/start?location=espn.com/college-football/schedule' }
+      { title: 'ESPN College Football Schedule', link: '/start?location=espn.com/college-football/schedule' },
+      { title: 'NBA Key Dates', link: '/start?location=nba.com/news/key-dates' }
     ];
 
     const itemize = ({ title, link }) => `<li><a href="${link}" target="_blank">${title}</a></li>`;

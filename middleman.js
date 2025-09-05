@@ -44,6 +44,7 @@ const pause = async () => {
 };
 
 const get_selector = (input_selector) => {
+  if (!input_selector) return { selector: null, frame_selector: null };
   const match = input_selector.match(/^(iframe(?:[^\s]*\[[^\]]+\]|[^\s]+))\s+(.+)$/);
   if (!match) return { selector: input_selector, frame_selector: null };
   return { frame_selector: match[1], selector: match[2] };
@@ -270,7 +271,6 @@ const autofill = async (page, distilled, fields) => {
   const document = parse(distilled);
   const root = document.querySelector('html');
   const domain = root?.getAttribute('gg-domain');
-
   for (const field of fields) {
     const element = document.querySelector(`input[type=${field}]`);
     const { selector, frame_selector } = get_selector(element?.getAttribute('gg-match'));

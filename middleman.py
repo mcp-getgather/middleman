@@ -311,7 +311,7 @@ def render(content: str, options: Optional[Dict[str, str]] = None) -> str:
     action = options.get("action", "")
 
     return f"""<!doctype html>
-<html>
+<html data-theme=light>
   <head>
     <title>{title}</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />

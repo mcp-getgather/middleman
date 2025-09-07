@@ -330,7 +330,7 @@ const render = (content, options = {}) => {
   const title = options.title || 'MIDDLEMAN';
   const action = options.action;
   return `<!doctype html>
-<html>
+<html data-theme=light>
   <head>
     <title>${title}</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />

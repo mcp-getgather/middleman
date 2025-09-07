@@ -441,7 +441,7 @@ const render = (content, options = {}) => {
           current = match;
           console.log();
           console.log(await prettier.format(distilled, { parser: 'html', printWidth: 120 }));
-          await autofill(page, distilled, ['email', 'password', 'tel', 'text']);
+          await autofill(page, distilled, ['email', 'tel', 'text', 'password']);
           await autoclick(page, distilled);
           if (await terminate(page, distilled)) {
             break;

@@ -172,7 +172,8 @@ async def distill(hostname: Optional[str], page: Page, patterns: List[Pattern]) 
         domain = root.get("gg-domain") if isinstance(root, Tag) else None
 
         if domain and hostname:
-            if isinstance(domain, str) and domain.lower() not in hostname.lower():
+            local = "localhost" in hostname or "127.0.0.1" in hostname
+            if isinstance(domain, str) and not local and domain.lower() not in hostname.lower():
                 if MIDDLEMAN_DEBUG:
                     print(f"{GRAY}Skipping {name} due to mismatched domain {domain}{NORMAL}")
                 continue

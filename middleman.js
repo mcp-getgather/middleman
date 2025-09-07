@@ -202,7 +202,8 @@ const distill = async (hostname, page, patterns) => {
     const domain = root?.getAttribute('gg-domain');
 
     if (domain && hostname) {
-      if (!hostname.toLowerCase().includes(domain.toLowerCase())) {
+      const local = hostname.includes('localhost') || hostname.includes('127.0.0.1');
+      if (!local && !hostname.toLowerCase().includes(domain.toLowerCase())) {
         MIDDLEMAN_DEBUG && console.log(`${GRAY}Skipping ${name} due to mismatched domain ${domain}${NORMAL}`);
         continue;
       }

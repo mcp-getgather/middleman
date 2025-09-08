@@ -588,7 +588,7 @@ async def run_command(location: str):
                     current = match
                     print()
                     print(distilled)
-                    await autofill(page, distilled, ["email", "password", "tel", "text"])
+                    await autofill(page, distilled, ["email", "tel", "text", "password"])
                     await autoclick(page, distilled)
 
                     if await terminate(page, distilled):

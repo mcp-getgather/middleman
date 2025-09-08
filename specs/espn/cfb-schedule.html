@@ -1,57 +1,20 @@
 <html gg-domain="espn">
   <body>
-    <style>
-      /* Hide all complex elements except game matchups */
-      .DatePicker,
-      .dropdown,
-      .Table__TH,
-      .tickets__col,
-      .venue__col,
-      .odds__col,
-      .broadcast__col,
-      .network-container,
-      thead,
-      .Table__Title {
-        display: none;
+    <section gg-stop gg-match-html="section:has(.Table)"></section>
+    <script type="application/json" id="cfb-schedule">
+      {
+        "rows": ".Table tbody tr",
+        "columns": [
+          { "name": "away_team", "selector": ".events__col .Table__Team a:last-child" },
+          { "name": "away_rank", "selector": ".events__col .rank" },
+          { "name": "home_team", "selector": ".colspan__col .Table__Team a:last-child" },
+          { "name": "home_rank", "selector": ".colspan__col .rank" },
+          { "name": "time", "selector": "td:nth-child(3)" },
+          { "name": "location", "selector": ".venue__col a" },
+          { "name": "betting_line", "selector": ".odds__col [data-testid='OddsFragmentLine']" },
+          { "name": "over_under", "selector": ".odds__col [data-testid='OddsFragmentOverUnder']" }
+        ]
       }
-
-      /* Simple game list styling */
-      .Table__TR {
-        display: block;
-        margin: 10px 0;
-        padding: 10px;
-        border-bottom: 1px solid #ddd;
-      }
-
-      .Table__Team {
-        font-size: 16px;
-        font-weight: normal;
-      }
-
-      .Table__Team img {
-        width: 20px;
-        height: 20px;
-        margin-right: 5px;
-      }
-
-      .at {
-        margin: 0 5px;
-      }
-
-      .date__col a {
-        font-size: 14px;
-        color: #666;
-        text-decoration: none;
-      }
-
-      /* Show only team names and game time */
-      .events__col,
-      .colspan__col,
-      .date__col {
-        display: inline-block;
-        margin-right: 15px;
-      }
-    </style>
-    <section gg-stop gg-match-html="div[aria-label='Standings Page'] section"></section>
+    </script>
   </body>
 </html>

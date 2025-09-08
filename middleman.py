@@ -355,6 +355,8 @@ async def home():
         {"title": "Gofood Order History", "link": "/start?location=gofood.co.id/en/orders"},
         {"title": "eBird Life List", "link": "/start?location=ebird.org/lifelist"},
         {"title": "Agoda Booking History", "link": "/start?location=agoda.com/account/bookings.html"},
+        {"title": "ESPN College Football Schedule", "link": "/start?location=espn.com/college-football/schedule"},
+        {"title": "NBA Key Dates", "link": "/start?location=nba.com/news/key-dates"},
     ]
 
     items = [f'<li><a href="{item["link"]}" target="_blank">{item["title"]}</a></li>' for item in examples]
@@ -588,7 +590,7 @@ async def run_command(location: str):
                     current = match
                     print()
                     print(distilled)
-                    await autofill(page, distilled, ["email", "password", "tel", "text"])
+                    await autofill(page, distilled, ["email", "tel", "text", "password"])
                     await autoclick(page, distilled)
 
                     if await terminate(page, distilled):

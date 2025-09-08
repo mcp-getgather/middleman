@@ -44,6 +44,7 @@ const pause = async () => {
 };
 
 const get_selector = (input_selector) => {
+  if (!input_selector) return { selector: null, frame_selector: null };
   const match = input_selector.match(/^(iframe(?:[^\s]*\[[^\]]+\]|[^\s]+))\s+(.+)$/);
   if (!match) return { selector: input_selector, frame_selector: null };
   return { frame_selector: match[1], selector: match[2] };
@@ -270,7 +271,6 @@ const autofill = async (page, distilled, fields) => {
   const document = parse(distilled);
   const root = document.querySelector('html');
   const domain = root?.getAttribute('gg-domain');
-
   for (const field of fields) {
     const element = document.querySelector(`input[type=${field}]`);
     const { selector, frame_selector } = get_selector(element?.getAttribute('gg-match'));
@@ -441,7 +441,7 @@ const render = (content, options = {}) => {
           current = match;
           console.log();
           console.log(await prettier.format(distilled, { parser: 'html', printWidth: 120 }));
-          await autofill(page, distilled, ['email', 'password', 'tel', 'text']);
+          await autofill(page, distilled, ['email', 'tel', 'text', 'password']);
           await autoclick(page, distilled);
           if (await terminate(page, distilled)) {
             break;
@@ -488,7 +488,9 @@ const render = (content, options = {}) => {
       { title: 'BBC Saved Articles', link: '/start?location=bbc.com/saved' },
       { title: 'Amazon Browsing History', link: '/start?location=amazon.com/gp/history' },
       { title: 'Gofood Order History', link: '/start?location=gofood.co.id/en/orders' },
-      { title: 'Agoda Booking History', link: '/start?location=agoda.com/account/bookings.html' }
+      { title: 'Agoda Booking History', link: '/start?location=agoda.com/account/bookings.html' },
+      { title: 'ESPN College Football Schedule', link: '/start?location=espn.com/college-football/schedule' },
+      { title: 'NBA Key Dates', link: '/start?location=nba.com/news/key-dates' }
     ];
 
     const itemize = ({ title, link }) => `<li><a href="${link}" target="_blank">${title}</a></li>`;

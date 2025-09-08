@@ -12,7 +12,8 @@ from typing import Dict, List, Optional, TypedDict, cast
 from bs4 import BeautifulSoup
 from bs4.element import Tag
 from fastapi import FastAPI, HTTPException, Request
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, JSONResponse
+import json
 import nanoid
 from patchright.async_api import BrowserContext, Locator, Page, async_playwright
 import pwinput
@@ -303,6 +304,49 @@ async def terminate(page: Page, distilled: str) -> bool:
     return False
 
 
+async def convert(page: Page, distilled: str):
+    document = parse(distilled)
+    snippet = document.find("script", {"type": "application/json"})
+    if snippet:
+        print(f"{GREEN}{ARROW} Found a data converter.{NORMAL}")
+        if MIDDLEMAN_DEBUG:
+            print(snippet.get_text())
+        try:
+            converter = json.loads(snippet.get_text())
+            if MIDDLEMAN_DEBUG:
+                print("Start converting using", converter)
+
+            rows = document.select(str(converter.get("rows", "")))
+            print(f"  Finding rows using {CYAN}{converter.get('rows')}{NORMAL}: found {GREEN}{len(rows)}{NORMAL}.")
+            converted = []
+            for i, el in enumerate(rows):
+                if MIDDLEMAN_DEBUG:
+                    print(f" Converting row {GREEN}{i + 1}{NORMAL} of {len(rows)}")
+                kv: Dict[str, str] = {}
+                for col in converter.get("columns", []):
+                    name = col.get("name")
+                    selector = col.get("selector")
+                    attribute = col.get("attribute")
+                    if not name or not selector:
+                        continue
+                    item = el.select_one(str(selector))
+                    if item:
+                        if attribute:
+                            value = item.get(attribute)
+                            if isinstance(value, list):
+                                value = value[0] if value else None
+                            if isinstance(value, str):
+                                kv[name] = value.strip()
+                        else:
+                            kv[name] = item.get_text(strip=True)
+                if len(kv.keys()) > 0:
+                    converted.append(kv)
+            print(f"{GREEN}{CHECK} Conversion done for {GREEN}{len(converted)}{NORMAL} entries.")
+            return converted
+        except Exception as error:
+            print(f"{RED}Conversion error:{NORMAL}", str(error))
+
+
 def render(content: str, options: Optional[Dict[str, str]] = None) -> str:
     if options is None:
         options = {}
@@ -481,8 +525,11 @@ async def link(id: str, request: Request):
             await autoclick(page, distilled)
             if await terminate(page, distilled):
                 print(f"{GREEN}{CHECK} Finished!{NORMAL}")
+                converted = await convert(page, distilled)
                 await context.close()
                 browsers[:] = [b for b in browsers if b["id"] != id]
+                if converted:
+                    return JSONResponse(converted)
                 return HTMLResponse(render(str(document.find("body")), {"title": title, "action": action}))
 
             print(f"{GREEN}{CHECK} All form fields are filled{NORMAL}")
@@ -490,8 +537,11 @@ async def link(id: str, request: Request):
 
         if await terminate(page, distilled):
             print(f"{GREEN}{CHECK} Finished!{NORMAL}")
+            converted = await convert(page, distilled)
             await context.close()
             browsers[:] = [b for b in browsers if b["id"] != id]
+            if converted:
+                return JSONResponse(converted)
         else:
             print(f"{CROSS}{RED} Not all form fields are filled{NORMAL}")
 
@@ -541,6 +591,13 @@ async def distill_command(location: str, option: Optional[str] = None):
             print()
             print(distilled)
             print()
+            if await terminate(page, distilled):
+                print(f"{GREEN}{CHECK} Finished!{NORMAL}")
+                converted = await convert(page, distilled)
+                if converted:
+                    print()
+                    print(converted)
+                    print()
 
         if MIDDLEMAN_PAUSE:
             await pause()
@@ -595,6 +652,10 @@ async def run_command(location: str):
                     await autoclick(page, distilled)
 
                     if await terminate(page, distilled):
+                        converted = await convert(page, distilled)
+                        if converted:
+                            print()
+                            print(converted)
                         break
             else:
                 print(f"{CROSS}{RED} No matched pattern found{NORMAL}")

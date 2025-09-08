@@ -326,6 +326,42 @@ const terminate = async (page, distilled) => {
   return false;
 };
 
+const convert = async (page, distilled) => {
+  const document = parse(distilled);
+  const snippet = document.querySelector('script[type="application/json"]');
+  if (snippet) {
+    console.log(`${GREEN}${ARROW} Found a data converter.${NORMAL}`);
+    MIDDLEMAN_DEBUG && console.log(`${snippet.innerHTML}`);
+    try {
+      const converter = JSON.parse(snippet.innerHTML);
+      MIDDLEMAN_DEBUG && console.log('Start converting using', converter);
+
+      const rows = Array.from(document.querySelectorAll(converter.rows));
+      console.log(`  Finding rows using ${CYAN}${converter.rows}${NORMAL}: found ${GREEN}${rows.length}${NORMAL}.`);
+      const converted = [];
+      rows.forEach((el, i) => {
+        MIDDLEMAN_DEBUG && console.log(` Converting row ${GREEN}${i + 1}${NORMAL} of ${rows.length}`);
+        const kv = {};
+        converter.columns.forEach(({ name, selector, attribute }) => {
+          const item = el.querySelector(selector);
+          if (attribute && item) {
+            kv[name] = item.getAttribute(attribute).trim();
+          } else if (item) {
+            kv[name] = item.textContent.trim();
+          }
+        });
+        if (Object.keys(kv).length > 0) {
+          converted.push(kv);
+        }
+      });
+      console.log(`${GREEN}${CHECK} Conversion done for ${GREEN}${converted.length}${NORMAL} entries.`);
+      return converted;
+    } catch (error) {
+      console.error(`${RED}Conversion error:${NORMAL}`, error.message);
+    }
+  }
+};
+
 const render = (content, options = {}) => {
   const title = options.title || 'MIDDLEMAN';
   const action = options.action;
@@ -402,6 +438,16 @@ const render = (content, options = {}) => {
       console.log();
       console.log(await prettier.format(distilled, { parser: 'html', printWidth: 120 }));
       console.log();
+
+      if (await terminate(page, distilled)) {
+        console.log(`${GREEN}${CHECK} Finished!${NORMAL}`);
+        const converted = await convert(page, distilled);
+        if (converted) {
+          console.log();
+          console.log(converted);
+          console.log();
+        }
+      }
     }
 
     MIDDLEMAN_PAUSE && (await pause());
@@ -445,6 +491,11 @@ const render = (content, options = {}) => {
           await autofill(page, distilled, ['email', 'tel', 'text', 'password']);
           await autoclick(page, distilled);
           if (await terminate(page, distilled)) {
+            const converted = await convert(page, distilled);
+            if (converted) {
+              console.log();
+              console.log(converted);
+            }
             break;
           }
         }
@@ -608,7 +659,13 @@ const render = (content, options = {}) => {
         await autoclick(page, distilled);
         if (await terminate(page, distilled)) {
           console.log(`${GREEN}${CHECK} Finished!${NORMAL}`);
+          const converted = await convert(page, distilled);
           await context.close();
+          if (converted) {
+            console.log();
+            console.log(converted);
+            return c.json(converted);
+          }
           return c.html(render(document.body.innerHTML, { title, action }));
         }
 
@@ -618,7 +675,11 @@ const render = (content, options = {}) => {
 
       if (await terminate(page, distilled)) {
         console.log(`${GREEN}${CHECK} Finished!${NORMAL}`);
+        const converted = await convert(page, distilled);
         await context.close();
+        if (converted) {
+          return c.json(converted);
+        }
       } else {
         console.warn(`${CROSS}${RED} Not all form fields are filled${NORMAL}`);
       }

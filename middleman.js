@@ -437,6 +437,9 @@ const render = (content, options = {}) => {
         const { name, distilled } = match;
         if (distilled === current.distilled) {
           console.log('Still the same:', name);
+          if (current.distilled.includes('gg-optional')) {
+            current = { name: null, distilled: null };
+          }
         } else {
           current = match;
           console.log();
@@ -563,6 +566,10 @@ const render = (content, options = {}) => {
       const { distilled } = match;
       if (distilled === current.distilled) {
         console.log(`${ARROW} Still the same : ${match.name}`);
+        if (current.distilled.includes('gg-optional')) {
+          current = { name: null, distilled: null };
+        }
+
         continue;
       }
 

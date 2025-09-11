@@ -245,40 +245,57 @@ async def distill(hostname: Optional[str], page: Page, patterns: List[Pattern]) 
         return match
 
 
-async def autofill(page: Page, distilled: str, fields: List[str]):
+async def autofill(page: Page, distilled: str):
     document = parse(distilled)
     root = document.find("html")
     domain = None
     if root:
         domain = cast(Tag, root).get("gg-domain")
 
-    for field in fields:
-        element = document.find("input", {"type": field})
-        selector = None
-        frame_selector = None
-        if element:
-            selector, frame_selector = get_selector(str(cast(Tag, element).get("gg-match")))
+    for element in document.find_all("input", {"type": True}):
+        if not isinstance(element, Tag):
+            continue
 
-        if element and selector:
+        input_type = element.get("type")
+        name = element.get("name")
+
+        if not name or (isinstance(name, str) and len(name) == 0):
+            print(f"{CROSS}{RED} There is an input (of type {input_type}) without a name!{NORMAL}")
+
+        selector, frame_selector = get_selector(str(element.get("gg-match", "")))
+        if not selector:
+            print(f"{CROSS}{RED} There is an input (of type {input_type}) without a selector!{NORMAL}")
+            continue
+
+        if input_type in ["email", "tel", "text", "password"]:
+            field = name or input_type
+            if MIDDLEMAN_DEBUG:
+                print(f"{ARROW} Autofilling type={input_type} name={name}...")
+
             source = f"{domain}_{field}" if domain else field
-            key = source.upper()
+            key = str(source).upper()
             value = os.getenv(key)
 
-            if value and len(value) > 0:
+            if value and isinstance(value, str) and len(value) > 0:
                 print(f"{CYAN}{ARROW} Using {BOLD}{key}{NORMAL} for {field}{NORMAL}")
                 if frame_selector:
                     await page.frame_locator(str(frame_selector)).locator(str(selector)).fill(value)
                 else:
                     await page.fill(str(selector), value)
+                element["value"] = value
             else:
-                placeholder = cast(Tag, element).get("placeholder")
+                placeholder = element.get("placeholder")
                 prompt = str(placeholder) if placeholder else f"Please enter {field}"
-                mask = "*" if field == "password" else None
+                mask = "*" if input_type == "password" else None
+                user_input = await ask(prompt, mask)
                 if frame_selector:
-                    await page.frame_locator(str(frame_selector)).locator(str(selector)).fill(await ask(prompt, mask))
+                    await page.frame_locator(str(frame_selector)).locator(str(selector)).fill(user_input)
                 else:
-                    await page.fill(str(selector), await ask(prompt, mask))
+                    await page.fill(str(selector), user_input)
+                element["value"] = user_input
             await sleep(0.25)
+
+    return str(document)
 
 
 async def autoclick(page: Page, distilled: str):
@@ -468,7 +485,7 @@ async def link(id: str, request: Request):
     TIMEOUT = 15  # seconds
     max = TIMEOUT // TICK
 
-    current = {"name": None, "distilled": None}
+    current: dict[str, str] = {"name": "", "distilled": ""}
 
     for iteration in range(max):
         print()
@@ -485,7 +502,8 @@ async def link(id: str, request: Request):
             print(f"{ARROW} Still the same: {match['name']}")
             continue
 
-        current = match
+        current["name"] = match["name"]
+        current["distilled"] = match["distilled"]
         print()
         print(distilled)
 
@@ -508,6 +526,7 @@ async def link(id: str, request: Request):
                             print(f"{CYAN}{ARROW} Using form data {BOLD}{name}{NORMAL}")
                             names.append(str(name))
                             input["value"] = str(value)
+                            current["distilled"] = str(document)
                             if frame_selector:
                                 await page.frame_locator(str(frame_selector)).locator(str(selector)).fill(str(value))
                             else:
@@ -629,7 +648,7 @@ async def run_command(location: str):
     TIMEOUT = 15  # seconds
     max = TIMEOUT // TICK
 
-    current = {"name": None, "distilled": None}
+    current: dict[str, str] = {"name": "", "distilled": ""}
 
     try:
         for iteration in range(max):
@@ -639,18 +658,16 @@ async def run_command(location: str):
 
             match = await distill(hostname, page, patterns)
             if match:
-                name = match["name"]
-                distilled = match["distilled"]
-
-                if distilled == current["distilled"]:
-                    print(f"Still the same: {name}")
+                if match["distilled"] == current["distilled"]:
+                    print(f"Still the same: {match['name']}")
                 else:
-                    current = match
+                    distilled = await autofill(page, match["distilled"])
+                    current["name"] = match["name"]
+                    current["distilled"] = distilled
                     print()
                     print(distilled)
-                    await autofill(page, distilled, ["email", "tel", "text", "password"])
-                    await autoclick(page, distilled)
 
+                    await autoclick(page, distilled)
                     if await terminate(page, distilled):
                         converted = await convert(page, distilled)
                         if converted:

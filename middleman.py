@@ -252,6 +252,8 @@ async def autofill(page: Page, distilled: str):
     if root:
         domain = cast(Tag, root).get("gg-domain")
 
+    processed = []
+
     for element in document.find_all("input", {"type": True}):
         if not isinstance(element, Tag):
             continue
@@ -294,6 +296,46 @@ async def autofill(page: Page, distilled: str):
                     await page.fill(str(selector), user_input)
                 element["value"] = user_input
             await sleep(0.25)
+        elif input_type == "radio":
+            if not name:
+                print(f"{CROSS}{RED} There is no name for radio button with id {element.get('id')}!{NORMAL}")
+                continue
+            if name in processed:
+                continue
+            processed.append(name)
+
+            choices = []
+            print()
+            radio_buttons = document.find_all("input", {"type": "radio"})
+            for button in radio_buttons:
+                if not isinstance(button, Tag):
+                    continue
+                if button.get("name") != name:
+                    continue
+                button_id = button.get("id")
+                label_element = document.find("label", {"for": str(button_id)}) if button_id else None
+                label = label_element.get_text() if label_element else None
+                choices.append({"id": button_id, "label": label})
+                print(f" {len(choices)}. {label or button_id}")
+
+            choice = 0
+            while choice < 1 or choice > len(choices):
+                answer = await ask(f"Your choice (1-{len(choices)})")
+                try:
+                    choice = int(answer)
+                except ValueError:
+                    choice = 0
+
+            print(f"{CYAN}{ARROW} Choosing {YELLOW}{choices[choice - 1]['label']}{NORMAL}")
+            print()
+
+            radio = document.find("input", {"type": "radio", "id": choices[choice - 1]["id"]})
+            if radio and isinstance(radio, Tag):
+                selector, frame_selector = get_selector(str(radio.get("gg-match")))
+                if frame_selector:
+                    await page.frame_locator(str(frame_selector)).locator(str(selector)).check()
+                else:
+                    await page.check(str(selector))
 
     return str(document)
 
@@ -520,6 +562,26 @@ async def link(id: str, request: Request):
                     if input.get("type") == "checkbox":
                         names.append(str(name) if name else "checkbox")
                         print(f"{CYAN}{ARROW} Handling {NORMAL}{selector} using autoclick")
+                    elif input.get("type") == "radio":
+                        value = fields.get(str(name)) if name else None
+                        if not value or len(str(value)) == 0:
+                            print(f"{CROSS}{RED} No form data found for radio button group {BOLD}{name}{NORMAL}")
+                            continue
+                        radio = document.find("input", {"type": "radio", "id": str(value)})
+                        if not radio or not isinstance(radio, Tag):
+                            print(f"{CROSS}{RED} No radio button found with id {BOLD}{value}{NORMAL}")
+                            continue
+                        print(f"{CYAN}{ARROW} Handling radio button group {BOLD}{name}{NORMAL}")
+                        print(f"{CYAN}{ARROW} Using form data {BOLD}{name}={value}{NORMAL}")
+                        radio_selector, radio_frame_selector = get_selector(str(radio.get("gg-match")))
+                        if radio_frame_selector:
+                            await page.frame_locator(str(radio_frame_selector)).locator(str(radio_selector)).check()
+                        else:
+                            await page.check(str(radio_selector))
+                        radio["checked"] = "checked"
+                        current["distilled"] = str(document)
+                        names.append(str(input.get("id")) if input.get("id") else "radio")
+                        await sleep(0.25)
                     elif name:
                         value = fields.get(str(name))
                         if value and len(str(value)) > 0:
@@ -540,7 +602,7 @@ async def link(id: str, request: Request):
         title = title_element.get_text() if title_element else "MIDDLEMAN"
         action = f"/link/{id}"
 
-        if len(inputs) == len(names):
+        if len(names) > 0 and len(inputs) == len(names):
             await autoclick(page, distilled)
             if await terminate(page, distilled):
                 print(f"{GREEN}{CHECK} Finished!{NORMAL}")

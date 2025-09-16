@@ -273,6 +273,8 @@ const autofill = async (page, distilled) => {
   const root = document.querySelector('html');
   const domain = root?.getAttribute('gg-domain');
 
+  const processed = [];
+
   for (const element of document.querySelectorAll('input[type]')) {
     const type = element.getAttribute('type');
     const name = element.getAttribute('name');
@@ -312,6 +314,38 @@ const autofill = async (page, distilled) => {
         element.setAttribute('value', value);
       }
       await sleep(0.25);
+    } else if (type === 'radio') {
+      const name = element.getAttribute('name');
+      if (!name) {
+        console.error(`${CROSS}${RED} There is no name for radio button with id ${element.id}!`);
+        continue;
+      }
+      if (processed.includes(name)) {
+        continue;
+      }
+      processed.push(name);
+      const choices = [];
+      console.log();
+      for (const button of document.querySelectorAll(`input[type=radio][name="${name}"]`)) {
+        const id = button.id;
+        const label = document.querySelector(`label[for="${id}"]`)?.textContent;
+        choices.push({ id, label });
+        console.log(` ${choices.length}. ${label || id}`);
+      }
+      let choice = 0;
+      while (choice < 1 || choice > choices.length) {
+        const answer = await ask(`Your choice (1-${choices.length})`);
+        choice = parseInt(answer, 10);
+      }
+      console.log(`${CYAN}${ARROW} Choosing ${YELLOW}${choices[choice - 1].label}${NORMAL}`);
+      console.log();
+      const radio = document.querySelector(`input[type=radio]#${choices[choice - 1].id}`);
+      const { selector, frame_selector } = get_selector(radio?.getAttribute('gg-match'));
+      if (frame_selector) {
+        await page.frameLocator(frame_selector).locator(selector).check();
+      } else {
+        await page.check(selector);
+      }
     }
   }
 
@@ -648,6 +682,29 @@ const render = (content, options = {}) => {
           if (input.type === 'checkbox') {
             names.push(name || 'checkbox');
             console.log(`${CYAN}${ARROW} Handling ${NORMAL}${selector} using autoclick`);
+          } else if (input.type === 'radio') {
+            const value = fields[name];
+            if (!value || value.length === 0) {
+              console.warn(`${CROSS}${RED} No form data found for radio button group ${BOLD}${name}${NORMAL}`);
+              continue;
+            }
+            const radio = document.querySelector(`input[type=radio][id="${value}"]`);
+            if (!radio) {
+              console.warn(`${CROSS}${RED} No radio button found with id ${BOLD}${value}${NORMAL}`);
+              continue;
+            }
+            console.log(`${CYAN}${ARROW} Handling radio button group ${BOLD}${name}${NORMAL}`);
+            console.log(`${CYAN}${ARROW} Using form data ${BOLD}${name}=${value}${NORMAL}`);
+            const { selector, frame_selector } = get_selector(radio?.getAttribute('gg-match'));
+            if (frame_selector) {
+              await page.frameLocator(frame_selector).locator(selector).check();
+            } else {
+              await page.check(selector);
+            }
+            radio.setAttribute('checked', 'checked');
+            current.distilled = document.documentElement.outerHTML;
+            names.push(input.id || 'radio');
+            await sleep(0.25);
           } else if (name) {
             const value = fields[name];
             if (value && value.length && value.length > 0) {
@@ -675,7 +732,7 @@ const render = (content, options = {}) => {
       const title = document.title;
       const action = `/link/${id}`;
 
-      if (inputs.length === names.length) {
+      if (names.length > 0 && inputs.length === names.length) {
         await autoclick(page, distilled);
         if (await terminate(page, distilled)) {
           console.log(`${GREEN}${CHECK} Finished!${NORMAL}`);

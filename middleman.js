@@ -268,14 +268,26 @@ const distill = async (hostname, page, patterns) => {
   }
 };
 
-const autofill = async (page, distilled, fields) => {
+const autofill = async (page, distilled) => {
   const document = parse(distilled);
   const root = document.querySelector('html');
   const domain = root?.getAttribute('gg-domain');
-  for (const field of fields) {
-    const element = document.querySelector(`input[type=${field}]`);
+
+  for (const element of document.querySelectorAll('input[type]')) {
+    const type = element.getAttribute('type');
+    const name = element.getAttribute('name');
+    if (!name || name.length === 0) {
+      console.error(`${CROSS}${RED} There is an input (of type ${type}) without a name!`);
+    }
     const { selector, frame_selector } = get_selector(element?.getAttribute('gg-match'));
-    if (element && selector) {
+    if (!selector) {
+      console.error(`${CROSS}${RED} There is an input (of type ${type}) without a selector!`);
+      continue;
+    }
+
+    if (['email', 'tel', 'text', 'password'].includes(type)) {
+      const field = name || type;
+      MIDDLEMAN_DEBUG && console.log(`${ARROW} Autofilling type=${type} name=${name}...`);
       const source = domain ? domain + '_' + field : field;
       const key = source.toUpperCase();
       const value = process.env[key];
@@ -286,22 +298,24 @@ const autofill = async (page, distilled, fields) => {
         } else {
           await page.fill(selector, value);
         }
+        element.setAttribute('value', value);
       } else {
         const placeholder = element.getAttribute('placeholder');
         const prompt = placeholder || `Please enter ${field}`;
         const mask = field === 'password' ? '*' : null;
+        const value = await ask(prompt, mask);
         if (frame_selector) {
-          await page
-            .frameLocator(frame_selector)
-            .locator(selector)
-            .fill(await ask(prompt, mask));
+          await page.frameLocator(frame_selector).locator(selector).fill(value);
         } else {
-          await page.fill(selector, await ask(prompt, mask));
+          await page.fill(selector, value);
         }
+        element.setAttribute('value', value);
       }
       await sleep(0.25);
     }
   }
+
+  return document.documentElement.outerHTML;
 };
 
 const autoclick = async (page, distilled) => {
@@ -481,14 +495,15 @@ const render = (content, options = {}) => {
       await sleep(TICK);
       const match = await distill(hostname, page, patterns);
       if (match) {
-        const { name, distilled } = match;
-        if (distilled === current.distilled) {
-          console.log('Still the same:', name);
+        if (match.distilled === current.distilled) {
+          console.log('Still the same:', match.name);
         } else {
-          current = match;
+          const distilled = await autofill(page, match.distilled);
+          current.name = match.name;
+          current.distilled = distilled;
           console.log();
           console.log(await prettier.format(distilled, { parser: 'html', printWidth: 120 }));
-          await autofill(page, distilled, ['email', 'tel', 'text', 'password']);
+
           await autoclick(page, distilled);
           if (await terminate(page, distilled)) {
             const converted = await convert(page, distilled);
@@ -618,9 +633,10 @@ const render = (content, options = {}) => {
         continue;
       }
 
-      current = match;
+      current.name = match.name;
+      current.distilled = distilled;
       console.log();
-      console.log(await prettier.format(distilled, { parser: 'html', printWidth: 120 }));
+      console.log(await prettier.format(current.distilled, { parser: 'html', printWidth: 120 }));
 
       const names = [];
       const document = parse(distilled);
@@ -643,6 +659,8 @@ const render = (content, options = {}) => {
               } else {
                 await page.fill(selector, value);
               }
+              input.setAttribute('value', value);
+              current.distilled = document.documentElement.outerHTML;
               delete fields[name];
               await sleep(0.25);
             } else {
@@ -651,6 +669,8 @@ const render = (content, options = {}) => {
           }
         }
       }
+
+      console.log(await prettier.format(current.distilled, { parser: 'html', printWidth: 120 }));
 
       const title = document.title;
       const action = `/link/${id}`;

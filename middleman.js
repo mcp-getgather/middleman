@@ -340,6 +340,20 @@ const terminate = async (page, distilled) => {
   return false;
 };
 
+const extractValue = (item, attribute = null) => {
+  if (attribute) {
+    let value = item.getAttribute(attribute);
+
+    if (Array.isArray(value)) {
+      value = value.length > 0 ? value[0] : '';
+    }
+
+    return typeof value === 'string' ? value.trim() : '';
+  }
+
+  return item.textContent.trim();
+};
+
 const convert = async (page, distilled) => {
   const document = parse(distilled);
   const snippet = document.querySelector('script[type="application/json"]');
@@ -356,12 +370,13 @@ const convert = async (page, distilled) => {
       rows.forEach((el, i) => {
         MIDDLEMAN_DEBUG && console.log(` Converting row ${GREEN}${i + 1}${NORMAL} of ${rows.length}`);
         const kv = {};
-        converter.columns.forEach(({ name, selector, attribute }) => {
-          const item = el.querySelector(selector);
-          if (attribute && item) {
-            kv[name] = item.getAttribute(attribute).trim();
-          } else if (item) {
-            kv[name] = item.textContent.trim();
+        converter.columns.forEach(({ name, selector, attribute, kind }) => {
+          if (kind === 'list') {
+            const items = el.querySelectorAll(selector);
+            kv[name] = Array.from(items).map((item) => extractValue(item, attribute));
+          } else {
+            const item = el.querySelector(selector);
+            kv[name] = extractValue(item, attribute);
           }
         });
         if (Object.keys(kv).length > 0) {

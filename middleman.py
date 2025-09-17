@@ -321,6 +321,15 @@ async def terminate(page: Page, distilled: str) -> bool:
     return False
 
 
+def extract_value(item: Tag, attribute: str | None = None) -> str:
+    if attribute:
+        value = item.get(attribute)
+        if isinstance(value, list):
+            value = value[0] if value else ""
+        return value.strip() if isinstance(value, str) else ""
+    return item.get_text(strip=True)
+
+
 async def convert(page: Page, distilled: str):
     document = parse(distilled)
     snippet = document.find("script", {"type": "application/json"})
@@ -344,18 +353,18 @@ async def convert(page: Page, distilled: str):
                     name = col.get("name")
                     selector = col.get("selector")
                     attribute = col.get("attribute")
+                    kind = col.get("kind")
                     if not name or not selector:
                         continue
+
+                    if kind == "list":
+                        items = el.select(str(selector))
+                        kv[name] = [extract_value(item, attribute) for item in items]
+                        continue
+
                     item = el.select_one(str(selector))
                     if item:
-                        if attribute:
-                            value = item.get(attribute)
-                            if isinstance(value, list):
-                                value = value[0] if value else None
-                            if isinstance(value, str):
-                                kv[name] = value.strip()
-                        else:
-                            kv[name] = item.get_text(strip=True)
+                        kv[name] = extract_value(item, attribute)
                 if len(kv.keys()) > 0:
                     converted.append(kv)
             print(f"{GREEN}{CHECK} Conversion done for {GREEN}{len(converted)}{NORMAL} entries.")

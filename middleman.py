@@ -419,6 +419,35 @@ def render(content: str, options: Optional[Dict[str, str]] = None) -> str:
     <title>{title}</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css">
+    <style>
+      .vertical-radios {{
+        display: flex;
+        flex-direction: column;
+        gap: 1rem;
+        margin-bottom: 1.5rem;
+      }}
+
+      .radio-wrapper {{
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+      }}
+
+      .radio-wrapper input[type='radio'] {{
+        margin: 0;
+        flex-shrink: 0;
+      }}
+
+      .radio-wrapper label {{
+        margin: 0;
+        cursor: pointer;
+        line-height: 1.5;
+      }}
+
+      .radio-wrapper:hover label {{
+        color: var(--pico-primary);
+      }}
+    </style>
   </head>
   <body>
     <main class="container">

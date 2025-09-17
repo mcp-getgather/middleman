@@ -348,7 +348,7 @@ async def convert(page: Page, distilled: str):
             for i, el in enumerate(rows):
                 if MIDDLEMAN_DEBUG:
                     print(f" Converting row {GREEN}{i + 1}{NORMAL} of {len(rows)}")
-                kv: Dict[str, str] = {}
+                kv: Dict[str, str | list[str]] = {}
                 for col in converter.get("columns", []):
                     name = col.get("name")
                     selector = col.get("selector")

@@ -193,6 +193,10 @@ const parse = (html) => {
 };
 
 async function safeInputValue(locator) {
+  const count = await locator.count();
+  if (count <= 0) {
+    return null;
+  }
   const el = locator.first();
   const tag = await el.evaluate((el) => el.tagName.toLowerCase());
 

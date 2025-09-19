@@ -300,7 +300,9 @@ const autofill = async (page, distilled) => {
         } else {
           await page.fill(selector, value);
         }
-        element.setAttribute('value', value);
+        if (type !== 'password') {
+          element.setAttribute('value', value);
+        }
       } else {
         const placeholder = element.getAttribute('placeholder');
         const prompt = placeholder || `Please enter ${field}`;
@@ -311,7 +313,9 @@ const autofill = async (page, distilled) => {
         } else {
           await page.fill(selector, value);
         }
-        element.setAttribute('value', value);
+        if (type !== 'password') {
+          element.setAttribute('value', value);
+        }
       }
       await sleep(0.25);
     } else if (type === 'radio') {

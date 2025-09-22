@@ -640,7 +640,9 @@ async def link(id: str, request: Request):
         title = title_element.get_text() if title_element else "MIDDLEMAN"
         action = f"/link/{id}"
 
-        if len(names) > 0 and len(inputs) == len(names):
+        if (len(names) > 0 and len(inputs) == len(names)) or (
+            document.find(attrs={"gg-autoclick": True}) and len(inputs) == 0 and len(names) == 0
+        ):
             await autoclick(page, distilled)
             if await terminate(page, distilled):
                 print(f"{GREEN}{CHECK} Finished!{NORMAL}")

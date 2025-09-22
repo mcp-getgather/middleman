@@ -776,7 +776,10 @@ const render = (content, options = {}) => {
       const title = document.title;
       const action = `/link/${id}`;
 
-      if (names.length > 0 && inputs.length === names.length) {
+      if (
+        (names.length > 0 && inputs.length === names.length) ||
+        (document.querySelector('[gg-autoclick]') && inputs.length === 0 && names.length === 0)
+      ) {
         await autoclick(page, distilled);
         if (await terminate(page, distilled)) {
           console.log(`${GREEN}${CHECK} Finished!${NORMAL}`);

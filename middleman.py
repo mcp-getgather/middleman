@@ -678,8 +678,8 @@ async def link(id: str, request: Request):
             continue
 
         if fields.get("button"):
-            button = document.find("button", {"value": fields.get("button")})
-            if button and not button.get("gg-autoclick"):
+            button = document.find("button", value=str(fields.get("button")))
+            if button and isinstance(button, Tag) and not button.get("gg-autoclick"):
                 button_selector, button_frame_selector = get_selector(str(button.get("gg-match")))
                 print(f"{CYAN}{ARROW} Clicking button {BOLD}{button_selector}{NORMAL}")
                 await click(page, str(button_selector), frame_selector=button_frame_selector)

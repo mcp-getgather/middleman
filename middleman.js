@@ -635,7 +635,8 @@ const render = (content, options = {}) => {
       { title: 'Gofood Order History', link: '/start?location=gofood.co.id/en/orders' },
       { title: 'Agoda Booking History', link: '/start?location=agoda.com/account/bookings.html' },
       { title: 'ESPN College Football Schedule', link: '/start?location=espn.com/college-football/schedule' },
-      { title: 'NBA Key Dates', link: '/start?location=nba.com/news/key-dates' }
+      { title: 'NBA Key Dates', link: '/start?location=nba.com/news/key-dates' },
+      { title: 'Shopee Login', link: '/start?location=shopee.co.id/buyer/login' }
     ];
 
     const itemize = ({ title, link }) => `<li><a href="${link}" target="_blank">${title}</a></li>`;
@@ -792,6 +793,16 @@ const render = (content, options = {}) => {
 
         console.log(`${GREEN}${CHECK} All form fields are filled${NORMAL}`);
         continue;
+      }
+
+      if (fields.button) {
+        const button = document.querySelector(`button[value="${fields.button}"]`);
+        if (button && !button.getAttribute('gg-autoclick')) {
+          const { selector, frame_selector } = get_selector(button.getAttribute('gg-match'));
+          console.log(`${CYAN}${ARROW} Clicking button ${BOLD}${selector}${NORMAL}`);
+          await click(page, selector, 3 * 1000, frame_selector);
+          continue;
+        }
       }
 
       if (await terminate(page, distilled)) {

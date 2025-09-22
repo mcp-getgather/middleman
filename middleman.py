@@ -499,6 +499,7 @@ async def home():
         {"title": "Agoda Booking History", "link": "/start?location=agoda.com/account/bookings.html"},
         {"title": "ESPN College Football Schedule", "link": "/start?location=espn.com/college-football/schedule"},
         {"title": "NBA Key Dates", "link": "/start?location=nba.com/news/key-dates"},
+        {"title": "Shopee Login", "link": "/start?location=shopee.co.id/buyer/login"},
     ]
 
     items = [f'<li><a href="{item["link"]}" target="_blank">{item["title"]}</a></li>' for item in examples]
@@ -653,6 +654,14 @@ async def link(id: str, request: Request):
 
             print(f"{GREEN}{CHECK} All form fields are filled{NORMAL}")
             continue
+
+        if fields.get("button"):
+            button = document.find("button", {"value": fields.get("button")})
+            if button and not button.get("gg-autoclick"):
+                button_selector, button_frame_selector = get_selector(str(button.get("gg-match")))
+                print(f"{CYAN}{ARROW} Clicking button {BOLD}{button_selector}{NORMAL}")
+                await click(page, str(button_selector), frame_selector=button_frame_selector)
+                continue
 
         if await terminate(page, distilled):
             print(f"{GREEN}{CHECK} Finished!{NORMAL}")

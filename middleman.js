@@ -349,6 +349,30 @@ const autofill = async (page, distilled) => {
     }
   }
 
+  console.log();
+  const buttons = [];
+  for (const button of document.querySelectorAll('button[name][value]:not([gg-autoclick])')) {
+    const label =
+      document.querySelector(`button[value="${button.getAttribute('value')}"]`)?.textContent ||
+      button.getAttribute('value');
+    console.log(`${buttons.length + 1}. ${label}`);
+    buttons.push({ value: button.getAttribute('value') });
+  }
+  if (buttons.length > 0) {
+    let choice = 0;
+    while (choice < 1 || choice > buttons.length) {
+      const answer = await ask(`Your choice (1-${buttons.length})`);
+      choice = parseInt(answer, 10);
+    }
+    const button = document.querySelector(`button[value="${buttons[choice - 1].value}"]`);
+    const { selector, frame_selector } = get_selector(button.getAttribute('gg-match'));
+    if (selector) {
+      console.log(`${CYAN}${ARROW} Clicking button ${BOLD}${selector}${NORMAL}`);
+      console.log();
+      await click(page, selector, 3 * 1000, frame_selector);
+    }
+  }
+
   return document.documentElement.outerHTML;
 };
 
@@ -796,8 +820,8 @@ const render = (content, options = {}) => {
       }
 
       if (fields.button) {
-        const button = document.querySelector(`button[value="${fields.button}"]`);
-        if (button && !button.getAttribute('gg-autoclick')) {
+        const button = document.querySelector(`button[value="${fields.button}"]:not([gg-autoclick])`);
+        if (button) {
           const { selector, frame_selector } = get_selector(button.getAttribute('gg-match'));
           console.log(`${CYAN}${ARROW} Clicking button ${BOLD}${selector}${NORMAL}`);
           await click(page, selector, 3 * 1000, frame_selector);

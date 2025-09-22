@@ -337,6 +337,28 @@ async def autofill(page: Page, distilled: str):
                 else:
                     await page.check(str(selector))
 
+    print()
+    buttons = []
+    for button in document.find_all("button", {"name": True, "value": True}):
+        if not isinstance(button, Tag):
+            continue
+        if button.get("gg-autoclick"):
+            continue
+        label = button.get_text() if button.get_text() else button.get("value")
+        print(f" {len(buttons) + 1}. {label}")
+        buttons.append({"value": button.get("value")})
+
+    if len(buttons) > 0:
+        choice = 0
+        while choice < 1 or choice > len(buttons):
+            answer = await ask(f"Your choice (1-{len(buttons)})")
+            choice = int(answer)
+        button = document.find("button", {"value": buttons[choice - 1]["value"]})
+        if button and isinstance(button, Tag):
+            selector, frame_selector = get_selector(str(button.get("gg-match")))
+            await click(page, str(selector), frame_selector=frame_selector)
+    print()
+
     return str(document)
 
 

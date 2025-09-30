@@ -10,6 +10,7 @@ from glob import glob
 from typing import Dict, List, Optional, TypedDict, cast
 
 from bs4 import BeautifulSoup
+from bs4._typing import _StrainableAttributes
 from bs4.element import Tag
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import HTMLResponse, JSONResponse
@@ -340,17 +341,14 @@ async def autofill(page: Page, distilled: str):
     return str(document)
 
 
-async def autoclick(page: Page, distilled: str):
+async def clicks(page: Page, distilled: str, attrs: _StrainableAttributes):
     document = parse(distilled)
-    buttons = document.find_all(attrs={"gg-autoclick": True})
-
+    buttons = document.find_all(attrs=attrs)
     for button in buttons:
         if isinstance(button, Tag):
             selector, frame_selector = get_selector(str(button.get("gg-match")))
             if selector:
-                print(f"{CYAN}{ARROW} Auto-clicking {NORMAL}{selector}")
-                if isinstance(frame_selector, list):
-                    frame_selector = frame_selector[0] if frame_selector else None
+                print(f"{CYAN}{ARROW} Clicking {NORMAL}{selector}")
                 await click(page, str(selector), frame_selector=frame_selector)
 
 
@@ -640,8 +638,14 @@ async def link(id: str, request: Request):
         title = title_element.get_text() if title_element else "MIDDLEMAN"
         action = f"/link/{id}"
 
-        if len(names) > 0 and len(inputs) == len(names):
-            await autoclick(page, distilled)
+        is_form_filled = len(names) > 0 and len(inputs) == len(names)
+        has_click_buttons = len(document.find_all(attrs={"gg-autoclick": True})) > 0
+        is_no_form = len(inputs) == 0
+
+        if is_form_filled or (has_click_buttons and is_no_form):
+            await clicks(page, distilled, {"gg-autoclick": True})
+            if is_form_filled:
+                await clicks(page, distilled, {"type": "submit"})
             if await terminate(page, distilled):
                 print(f"{GREEN}{CHECK} Finished!{NORMAL}")
                 converted = await convert(page, distilled)
@@ -767,7 +771,8 @@ async def run_command(location: str):
                     print()
                     print(distilled)
 
-                    await autoclick(page, distilled)
+                    await clicks(page, distilled, {"gg-autoclick": True})
+                    await clicks(page, distilled, {"type": "submit"})
                     if await terminate(page, distilled):
                         converted = await convert(page, distilled)
                         if converted:

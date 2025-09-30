@@ -352,13 +352,13 @@ const autofill = async (page, distilled) => {
   return document.documentElement.outerHTML;
 };
 
-const autoclick = async (page, distilled) => {
+const clicks = async (page, distilled, attrs) => {
   const document = parse(distilled);
-  const buttons = document.querySelectorAll('[gg-autoclick]');
+  const buttons = document.querySelectorAll(attrs);
   for (const button of buttons) {
     const { selector, frame_selector } = get_selector(button.getAttribute('gg-match'));
     if (selector) {
-      console.log(`${CYAN}${ARROW} Auto-clicking ${NORMAL}${selector}`);
+      console.log(`${CYAN}${ARROW} Clicking ${NORMAL}${selector}`);
       await click(page, selector, 3 * 1000, frame_selector);
     }
   }
@@ -582,7 +582,8 @@ const render = (content, options = {}) => {
           console.log();
           console.log(await prettier.format(distilled, { parser: 'html', printWidth: 120 }));
 
-          await autoclick(page, distilled);
+          await clicks(page, distilled, '[gg-autoclick]');
+          await clicks(page, distilled, '[type="submit"]');
           if (await terminate(page, distilled)) {
             const converted = await convert(page, distilled);
             if (converted) {
@@ -776,8 +777,15 @@ const render = (content, options = {}) => {
       const title = document.title;
       const action = `/link/${id}`;
 
-      if (names.length > 0 && inputs.length === names.length) {
-        await autoclick(page, distilled);
+      const is_form_filled = names.length > 0 && inputs.length === names.length;
+      const has_click_buttons = document.querySelectorAll('[gg-autoclick]').length > 0;
+      const is_no_form = inputs.length === 0;
+
+      if (is_form_filled || (has_click_buttons && is_no_form)) {
+        await clicks(page, distilled, '[gg-autoclick]');
+        if (is_form_filled) {
+          await clicks(page, distilled, '[type="submit"]');
+        }
         if (await terminate(page, distilled)) {
           console.log(`${GREEN}${CHECK} Finished!${NORMAL}`);
           const converted = await convert(page, distilled);

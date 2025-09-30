@@ -340,7 +340,7 @@ async def autofill(page: Page, distilled: str):
     return str(document)
 
 
-async def click_buttons(buttons: List[Tag], page: Page):
+async def click_buttons(buttons: list[Tag], page: Page):
     for button in buttons:
         if isinstance(button, Tag):
             selector, frame_selector = get_selector(str(button.get("gg-match")))
@@ -353,7 +353,7 @@ async def autoclick(page: Page, distilled: str):
     document = parse(distilled)
     buttons = document.find_all(attrs={"gg-autoclick": True})
 
-    if len(buttons) > 0:
+    if len(buttons) > 0 and isinstance(buttons, list[Tag]):
         print(f"{CYAN}{ARROW} Auto-clicking {NORMAL}{len(buttons)} buttons")
         await click_buttons(buttons, page)
 
@@ -362,7 +362,7 @@ async def autosubmit(page: Page, distilled: str):
     document = parse(distilled)
     buttons = document.find_all(attrs={"type": "submit"})
 
-    if len(buttons) > 0:
+    if len(buttons) > 0 and isinstance(buttons, list[Tag]):
         print(f"{CYAN}{ARROW} Auto-submitting {NORMAL}{len(buttons)} buttons")
         await click_buttons(buttons, page)
 

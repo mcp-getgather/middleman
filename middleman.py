@@ -10,6 +10,7 @@ from glob import glob
 from typing import Dict, List, Optional, TypedDict, cast
 
 from bs4 import BeautifulSoup
+from bs4._typing import _StrainableAttributes
 from bs4.element import Tag
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import HTMLResponse, JSONResponse
@@ -340,7 +341,9 @@ async def autofill(page: Page, distilled: str):
     return str(document)
 
 
-async def click_buttons(buttons: list[Tag], page: Page):
+async def clicks(page: Page, distilled: str, attrs: _StrainableAttributes):
+    document = parse(distilled)
+    buttons = document.find_all(attrs=attrs)
     for button in buttons:
         if isinstance(button, Tag):
             selector, frame_selector = get_selector(str(button.get("gg-match")))
@@ -350,21 +353,11 @@ async def click_buttons(buttons: list[Tag], page: Page):
 
 
 async def autoclick(page: Page, distilled: str):
-    document = parse(distilled)
-    buttons = document.find_all(attrs={"gg-autoclick": True})
-
-    if len(buttons) > 0 and isinstance(buttons, list[Tag]):
-        print(f"{CYAN}{ARROW} Auto-clicking {NORMAL}{len(buttons)} buttons")
-        await click_buttons(buttons, page)
+    await clicks(page, distilled, {"gg-autoclick": True})
 
 
 async def autosubmit(page: Page, distilled: str):
-    document = parse(distilled)
-    buttons = document.find_all(attrs={"type": "submit"})
-
-    if len(buttons) > 0 and isinstance(buttons, list[Tag]):
-        print(f"{CYAN}{ARROW} Auto-submitting {NORMAL}{len(buttons)} buttons")
-        await click_buttons(buttons, page)
+    await clicks(page, distilled, {"type": "submit"})
 
 
 async def terminate(page: Page, distilled: str) -> bool:

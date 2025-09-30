@@ -352,14 +352,6 @@ async def clicks(page: Page, distilled: str, attrs: _StrainableAttributes):
                 await click(page, str(selector), frame_selector=frame_selector)
 
 
-async def autoclick(page: Page, distilled: str):
-    await clicks(page, distilled, {"gg-autoclick": True})
-
-
-async def autosubmit(page: Page, distilled: str):
-    await clicks(page, distilled, {"type": "submit"})
-
-
 async def terminate(page: Page, distilled: str) -> bool:
     document = parse(distilled)
     stops = document.find_all(attrs={"gg-stop": True})
@@ -651,9 +643,9 @@ async def link(id: str, request: Request):
         is_no_form = len(inputs) == 0
 
         if is_form_filled or (has_click_buttons and is_no_form):
-            await autoclick(page, distilled)
+            await clicks(page, distilled, {"gg-autoclick": True})
             if is_form_filled:
-                await autosubmit(page, distilled)
+                await clicks(page, distilled, {"type": "submit"})
             if await terminate(page, distilled):
                 print(f"{GREEN}{CHECK} Finished!{NORMAL}")
                 converted = await convert(page, distilled)
@@ -779,7 +771,8 @@ async def run_command(location: str):
                     print()
                     print(distilled)
 
-                    await autoclick(page, distilled)
+                    await clicks(page, distilled, {"gg-autoclick": True})
+                    await clicks(page, distilled, {"type": "submit"})
                     if await terminate(page, distilled):
                         converted = await convert(page, distilled)
                         if converted:

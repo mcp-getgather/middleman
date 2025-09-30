@@ -364,14 +364,6 @@ const clicks = async (page, distilled, attrs) => {
   }
 };
 
-const autoclick = async (page, distilled) => {
-  await clicks(page, distilled, '[gg-autoclick]');
-};
-
-const autosubmit = async (page, distilled) => {
-  await clicks(page, distilled, '[type="submit"]');
-};
-
 const terminate = async (page, distilled) => {
   const document = parse(distilled);
   const stops = document.querySelectorAll('[gg-stop]');
@@ -590,8 +582,8 @@ const render = (content, options = {}) => {
           console.log();
           console.log(await prettier.format(distilled, { parser: 'html', printWidth: 120 }));
 
-          await autoclick(page, distilled);
-          await autosubmit(page, distilled);
+          await clicks(page, distilled, '[gg-autoclick]');
+          await clicks(page, distilled, '[type="submit"]');
           if (await terminate(page, distilled)) {
             const converted = await convert(page, distilled);
             if (converted) {
@@ -790,9 +782,9 @@ const render = (content, options = {}) => {
       const is_no_form = inputs.length === 0;
 
       if (is_form_filled || (has_click_buttons && is_no_form)) {
-        await autoclick(page, distilled);
+        await clicks(page, distilled, '[gg-autoclick]');
         if (is_form_filled) {
-          await autosubmit(page, distilled);
+          await clicks(page, distilled, '[type="submit"]');
         }
         if (await terminate(page, distilled)) {
           console.log(`${GREEN}${CHECK} Finished!${NORMAL}`);

@@ -352,7 +352,9 @@ const autofill = async (page, distilled) => {
   return document.documentElement.outerHTML;
 };
 
-const click_buttons = async (buttons, page) => {
+const clicks = async (page, distilled, attrs) => {
+  const document = parse(distilled);
+  const buttons = document.querySelectorAll(attrs);
   for (const button of buttons) {
     const { selector, frame_selector } = get_selector(button.getAttribute('gg-match'));
     if (selector) {
@@ -363,21 +365,11 @@ const click_buttons = async (buttons, page) => {
 };
 
 const autoclick = async (page, distilled) => {
-  const document = parse(distilled);
-  const buttons = document.querySelectorAll('[gg-autoclick]');
-  if (buttons.length > 0) {
-    console.log(`${CYAN}${ARROW} Auto-clicking ${NORMAL}${buttons.length} buttons`);
-    await click_buttons(buttons, page);
-  }
+  await clicks(page, distilled, '[gg-autoclick]');
 };
 
 const autosubmit = async (page, distilled) => {
-  const document = parse(distilled);
-  const buttons = document.querySelectorAll('[type="submit"]');
-  if (buttons.length > 0) {
-    console.log(`${CYAN}${ARROW} Auto-submitting ${NORMAL}${buttons.length} buttons`);
-    await click_buttons(buttons, page);
-  }
+  await clicks(page, distilled, '[type="submit"]');
 };
 
 const terminate = async (page, distilled) => {

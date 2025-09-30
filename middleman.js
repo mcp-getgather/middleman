@@ -352,15 +352,31 @@ const autofill = async (page, distilled) => {
   return document.documentElement.outerHTML;
 };
 
-const autoclick = async (page, distilled) => {
-  const document = parse(distilled);
-  const buttons = document.querySelectorAll('[gg-autoclick]');
+const click_buttons = async (buttons, page) => {
   for (const button of buttons) {
     const { selector, frame_selector } = get_selector(button.getAttribute('gg-match'));
     if (selector) {
-      console.log(`${CYAN}${ARROW} Auto-clicking ${NORMAL}${selector}`);
+      console.log(`${CYAN}${ARROW} Clicking ${NORMAL}${selector}`);
       await click(page, selector, 3 * 1000, frame_selector);
     }
+  }
+};
+
+const autoclick = async (page, distilled) => {
+  const document = parse(distilled);
+  const buttons = document.querySelectorAll('[gg-autoclick]');
+  if (buttons.length > 0) {
+    console.log(`${CYAN}${ARROW} Auto-clicking ${NORMAL}${buttons.length} buttons`);
+    await click_buttons(buttons, page);
+  }
+};
+
+const autosubmit = async (page, distilled) => {
+  const document = parse(distilled);
+  const buttons = document.querySelectorAll('[type="submit"]');
+  if (buttons.length > 0) {
+    console.log(`${CYAN}${ARROW} Auto-submitting ${NORMAL}${buttons.length} buttons`);
+    await click_buttons(buttons, page);
   }
 };
 
@@ -583,6 +599,7 @@ const render = (content, options = {}) => {
           console.log(await prettier.format(distilled, { parser: 'html', printWidth: 120 }));
 
           await autoclick(page, distilled);
+          await autosubmit(page, distilled);
           if (await terminate(page, distilled)) {
             const converted = await convert(page, distilled);
             if (converted) {
@@ -776,8 +793,15 @@ const render = (content, options = {}) => {
       const title = document.title;
       const action = `/link/${id}`;
 
-      if (names.length > 0 && inputs.length === names.length) {
+      const is_form_filled = names.length > 0 && inputs.length === names.length;
+      const has_click_buttons = document.querySelectorAll('[gg-autoclick]').length > 0;
+      const is_no_form = inputs.length === 0;
+
+      if (is_form_filled || (has_click_buttons && is_no_form)) {
         await autoclick(page, distilled);
+        if (is_form_filled) {
+          await autosubmit(page, distilled);
+        }
         if (await terminate(page, distilled)) {
           console.log(`${GREEN}${CHECK} Finished!${NORMAL}`);
           const converted = await convert(page, distilled);

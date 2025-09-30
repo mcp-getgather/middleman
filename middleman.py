@@ -340,18 +340,31 @@ async def autofill(page: Page, distilled: str):
     return str(document)
 
 
-async def autoclick(page: Page, distilled: str):
-    document = parse(distilled)
-    buttons = document.find_all(attrs={"gg-autoclick": True})
-
+async def click_buttons(buttons: List[Tag], page: Page):
     for button in buttons:
         if isinstance(button, Tag):
             selector, frame_selector = get_selector(str(button.get("gg-match")))
             if selector:
-                print(f"{CYAN}{ARROW} Auto-clicking {NORMAL}{selector}")
-                if isinstance(frame_selector, list):
-                    frame_selector = frame_selector[0] if frame_selector else None
+                print(f"{CYAN}{ARROW} Clicking {NORMAL}{selector}")
                 await click(page, str(selector), frame_selector=frame_selector)
+
+
+async def autoclick(page: Page, distilled: str):
+    document = parse(distilled)
+    buttons = document.find_all(attrs={"gg-autoclick": True})
+
+    if len(buttons) > 0:
+        print(f"{CYAN}{ARROW} Auto-clicking {NORMAL}{len(buttons)} buttons")
+        await click_buttons(buttons, page)
+
+
+async def autosubmit(page: Page, distilled: str):
+    document = parse(distilled)
+    buttons = document.find_all(attrs={"type": "submit"})
+
+    if len(buttons) > 0:
+        print(f"{CYAN}{ARROW} Auto-submitting {NORMAL}{len(buttons)} buttons")
+        await click_buttons(buttons, page)
 
 
 async def terminate(page: Page, distilled: str) -> bool:
@@ -640,8 +653,14 @@ async def link(id: str, request: Request):
         title = title_element.get_text() if title_element else "MIDDLEMAN"
         action = f"/link/{id}"
 
-        if len(names) > 0 and len(inputs) == len(names):
+        is_form_filled = len(names) > 0 and len(inputs) == len(names)
+        has_click_buttons = len(document.find_all(attrs={"gg-autoclick": True})) > 0
+        is_no_form = len(inputs) == 0
+
+        if is_form_filled or (has_click_buttons and is_no_form):
             await autoclick(page, distilled)
+            if is_form_filled:
+                await autosubmit(page, distilled)
             if await terminate(page, distilled):
                 print(f"{GREEN}{CHECK} Finished!{NORMAL}")
                 converted = await convert(page, distilled)

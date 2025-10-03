@@ -346,6 +346,16 @@ const autofill = async (page, distilled) => {
       } else {
         await page.check(selector);
       }
+    } else if (type === 'checkbox') {
+      const checked = element.getAttribute('checked');
+      if (checked !== null) {
+        console.log(`${CYAN}${ARROW} Checking ${BOLD}${name}${NORMAL}`);
+        if (frame_selector) {
+          await page.frameLocator(frame_selector).locator(selector).check();
+        } else {
+          await page.check(selector);
+        }
+      }
     }
   }
 

@@ -336,6 +336,14 @@ async def autofill(page: Page, distilled: str):
                     await page.frame_locator(str(frame_selector)).locator(str(selector)).check()
                 else:
                     await page.check(str(selector))
+        elif input_type == "checkbox":
+            checked = element.get("checked")
+            if checked is not None:
+                print(f"{CYAN}{ARROW} Checking {BOLD}{name}{NORMAL}")
+                if frame_selector:
+                    await page.frame_locator(str(frame_selector)).locator(str(selector)).check()
+                else:
+                    await page.check(str(selector))
 
     return str(document)
 

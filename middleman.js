@@ -346,6 +346,16 @@ const autofill = async (page, distilled) => {
       } else {
         await page.check(selector);
       }
+    } else if (type === 'checkbox') {
+      const checked = element.getAttribute('checked');
+      if (checked !== null) {
+        console.log(`${CYAN}${ARROW} Checking ${BOLD}${name}${NORMAL}`);
+        if (frame_selector) {
+          await page.frameLocator(frame_selector).locator(selector).check();
+        } else {
+          await page.check(selector);
+        }
+      }
     }
   }
 
@@ -724,8 +734,21 @@ const render = (content, options = {}) => {
         const name = input.name;
         if (selector) {
           if (input.type === 'checkbox') {
-            names.push(name || 'checkbox');
-            console.log(`${CYAN}${ARROW} Handling ${NORMAL}${selector} using autoclick`);
+            if (!name) {
+              console.warn(`${CROSS}${RED} No name for the checkbox ${NORMAL}${selector}`);
+              continue;
+            }
+            const value = fields[name];
+            const checked = value && value.length > 0;
+            names.push(name);
+            console.log(`${CYAN}${ARROW} Status of checkbox ${BOLD}${name}=${checked}${NORMAL}`);
+            if (checked) {
+              if (frame_selector) {
+                await page.frameLocator(frame_selector).locator(selector).check();
+              } else {
+                await page.check(selector);
+              }
+            }
           } else if (input.type === 'radio') {
             const value = fields[name];
             if (!value || value.length === 0) {

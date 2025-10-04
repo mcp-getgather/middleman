@@ -336,6 +336,14 @@ async def autofill(page: Page, distilled: str):
                     await page.frame_locator(str(frame_selector)).locator(str(selector)).check()
                 else:
                     await page.check(str(selector))
+        elif input_type == "checkbox":
+            checked = element.get("checked")
+            if checked is not None:
+                print(f"{CYAN}{ARROW} Checking {BOLD}{name}{NORMAL}")
+                if frame_selector:
+                    await page.frame_locator(str(frame_selector)).locator(str(selector)).check()
+                else:
+                    await page.check(str(selector))
 
     return str(document)
 
@@ -598,8 +606,18 @@ async def link(id: str, request: Request):
 
                 if selector:
                     if input.get("type") == "checkbox":
-                        names.append(str(name) if name else "checkbox")
-                        print(f"{CYAN}{ARROW} Handling {NORMAL}{selector} using autoclick")
+                        if not name:
+                            print(f"{CROSS}{RED} No name for the checkbox {NORMAL}{selector}")
+                            continue
+                        value = fields.get(str(name))
+                        checked = value and len(str(value)) > 0
+                        names.append(str(name))
+                        print(f"{CYAN}{ARROW} Status of checkbox {BOLD}{name}={checked}{NORMAL}")
+                        if checked:
+                            if frame_selector:
+                                await page.frame_locator(str(frame_selector)).locator(str(selector)).check()
+                            else:
+                                await page.check(str(selector))
                     elif input.get("type") == "radio":
                         value = fields.get(str(name)) if name else None
                         if not value or len(str(value)) == 0:

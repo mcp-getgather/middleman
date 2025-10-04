@@ -359,6 +359,30 @@ const autofill = async (page, distilled) => {
     }
   }
 
+  console.log();
+  const buttons = [];
+  for (const button of document.querySelectorAll('button[name][value]:not([gg-autoclick])')) {
+    const label =
+      document.querySelector(`button[value="${button.getAttribute('value')}"]`)?.textContent ||
+      button.getAttribute('value');
+    console.log(`${buttons.length + 1}. ${label}`);
+    buttons.push({ value: button.getAttribute('value') });
+  }
+  if (buttons.length > 0) {
+    let choice = 0;
+    while (choice < 1 || choice > buttons.length) {
+      const answer = await ask(`Your choice (1-${buttons.length})`);
+      choice = parseInt(answer, 10);
+    }
+    const button = document.querySelector(`button[value="${buttons[choice - 1].value}"]`);
+    const { selector, frame_selector } = get_selector(button.getAttribute('gg-match'));
+    if (selector) {
+      console.log(`${CYAN}${ARROW} Clicking button ${BOLD}${selector}${NORMAL}`);
+      console.log();
+      await click(page, selector, 3 * 1000, frame_selector);
+    }
+  }
+
   return document.documentElement.outerHTML;
 };
 
@@ -645,7 +669,8 @@ const render = (content, options = {}) => {
       { title: 'Gofood Order History', link: '/start?location=gofood.co.id/en/orders' },
       { title: 'Agoda Booking History', link: '/start?location=agoda.com/account/bookings.html' },
       { title: 'ESPN College Football Schedule', link: '/start?location=espn.com/college-football/schedule' },
-      { title: 'NBA Key Dates', link: '/start?location=nba.com/news/key-dates' }
+      { title: 'NBA Key Dates', link: '/start?location=nba.com/news/key-dates' },
+      { title: 'Shopee Login', link: '/start?location=shopee.co.id/buyer/login' }
     ];
 
     const itemize = ({ title, link }) => `<li><a href="${link}" target="_blank">${title}</a></li>`;
@@ -815,6 +840,16 @@ const render = (content, options = {}) => {
 
         console.log(`${GREEN}${CHECK} All form fields are filled${NORMAL}`);
         continue;
+      }
+
+      if (fields.button) {
+        const button = document.querySelector(`button[value="${fields.button}"]:not([gg-autoclick])`);
+        if (button) {
+          const { selector, frame_selector } = get_selector(button.getAttribute('gg-match'));
+          console.log(`${CYAN}${ARROW} Clicking button ${BOLD}${selector}${NORMAL}`);
+          await click(page, selector, 3 * 1000, frame_selector);
+          continue;
+        }
       }
 
       if (await terminate(page, distilled)) {

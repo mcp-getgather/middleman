@@ -345,6 +345,28 @@ async def autofill(page: Page, distilled: str):
                 else:
                     await page.check(str(selector))
 
+    print()
+    buttons = []
+    for button in document.find_all("button", {"name": True, "value": True}):
+        if not isinstance(button, Tag):
+            continue
+        if button.get("gg-autoclick"):
+            continue
+        label = button.get_text() if button.get_text() else button.get("value")
+        print(f" {len(buttons) + 1}. {label}")
+        buttons.append({"value": button.get("value")})
+
+    if len(buttons) > 0:
+        choice = 0
+        while choice < 1 or choice > len(buttons):
+            answer = await ask(f"Your choice (1-{len(buttons)})")
+            choice = int(answer)
+        button = document.find("button", {"value": buttons[choice - 1]["value"]})
+        if button and isinstance(button, Tag):
+            selector, frame_selector = get_selector(str(button.get("gg-match")))
+            await click(page, str(selector), frame_selector=frame_selector)
+    print()
+
     return str(document)
 
 
@@ -507,6 +529,7 @@ async def home():
         {"title": "Agoda Booking History", "link": "/start?location=agoda.com/account/bookings.html"},
         {"title": "ESPN College Football Schedule", "link": "/start?location=espn.com/college-football/schedule"},
         {"title": "NBA Key Dates", "link": "/start?location=nba.com/news/key-dates"},
+        {"title": "Shopee Login", "link": "/start?location=shopee.co.id/buyer/login"},
     ]
 
     items = [f'<li><a href="{item["link"]}" target="_blank">{item["title"]}</a></li>' for item in examples]
@@ -671,6 +694,14 @@ async def link(id: str, request: Request):
 
             print(f"{GREEN}{CHECK} All form fields are filled{NORMAL}")
             continue
+
+        if fields.get("button"):
+            button = document.find("button", value=str(fields.get("button")))
+            if button and isinstance(button, Tag) and not button.get("gg-autoclick"):
+                button_selector, button_frame_selector = get_selector(str(button.get("gg-match")))
+                print(f"{CYAN}{ARROW} Clicking button {BOLD}{button_selector}{NORMAL}")
+                await click(page, str(button_selector), frame_selector=button_frame_selector)
+                continue
 
         if await terminate(page, distilled):
             print(f"{GREEN}{CHECK} Finished!{NORMAL}")

@@ -595,8 +595,21 @@ async def link(id: str, request: Request):
         print()
         print(distilled)
 
-        names: List[str] = []
         document = parse(distilled)
+        title_element = document.find("title")
+        title = title_element.get_text() if title_element else "MIDDLEMAN"
+        action = f"/link/{id}"
+
+        if await terminate(page, distilled):
+            print(f"{GREEN}{CHECK} Finished!{NORMAL}")
+            converted = await convert(page, distilled)
+            await context.close()
+            browsers[:] = [b for b in browsers if b["id"] != id]
+            if converted:
+                return JSONResponse(converted)
+            return HTMLResponse(render(str(document.find("body")), {"title": title, "action": action}))
+
+        names: List[str] = []
         inputs = document.find_all("input")
 
         for input in inputs:
@@ -654,34 +667,12 @@ async def link(id: str, request: Request):
                         else:
                             print(f"{CROSS}{RED} No form data found for {BOLD}{name}{NORMAL}")
 
-        title_element = document.find("title")
-        title = title_element.get_text() if title_element else "MIDDLEMAN"
-        action = f"/link/{id}"
-
         if len(names) > 0 and len(inputs) == len(names):
             await autoclick(page, distilled)
-            if await terminate(page, distilled):
-                print(f"{GREEN}{CHECK} Finished!{NORMAL}")
-                converted = await convert(page, distilled)
-                await context.close()
-                browsers[:] = [b for b in browsers if b["id"] != id]
-                if converted:
-                    return JSONResponse(converted)
-                return HTMLResponse(render(str(document.find("body")), {"title": title, "action": action}))
-
             print(f"{GREEN}{CHECK} All form fields are filled{NORMAL}")
             continue
 
-        if await terminate(page, distilled):
-            print(f"{GREEN}{CHECK} Finished!{NORMAL}")
-            converted = await convert(page, distilled)
-            await context.close()
-            browsers[:] = [b for b in browsers if b["id"] != id]
-            if converted:
-                return JSONResponse(converted)
-        else:
-            print(f"{CROSS}{RED} Not all form fields are filled{NORMAL}")
-
+        print(f"{CROSS}{RED} Not all form fields are filled{NORMAL}")
         return HTMLResponse(render(str(document.find("body")), {"title": title, "action": action}))
 
     raise HTTPException(status_code=503, detail="Timeout reached")
@@ -779,19 +770,21 @@ async def run_command(location: str):
                 if match["distilled"] == current["distilled"]:
                     print(f"Still the same: {match['name']}")
                 else:
-                    distilled = await autofill(page, match["distilled"])
+                    distilled = match["distilled"]
                     current["name"] = match["name"]
                     current["distilled"] = distilled
                     print()
                     print(distilled)
 
-                    await autoclick(page, distilled)
                     if await terminate(page, distilled):
                         converted = await convert(page, distilled)
                         if converted:
                             print()
                             print(converted)
                         break
+
+                    distilled = await autofill(page, match["distilled"])
+                    await autoclick(page, distilled)
             else:
                 print(f"{CROSS}{RED} No matched pattern found{NORMAL}")
 

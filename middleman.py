@@ -118,6 +118,63 @@ class Handle(TypedDict):
     page: Page
 
 
+BLOCKED_DOMAINS = [
+    "3lift.com",
+    "adnxs.com",
+    "adobedtm.com",
+    "adsrvr.org",
+    "amazon-adsystem.com",
+    "amplitude.com",
+    "appboy.com",
+    "bamgrid.com",
+    "bounceexchange.com",
+    "brandmetrics.com",
+    "casalamedia.com",
+    "consentmanager.net",
+    "cookielaw.org",
+    "covatic.io",
+    "criteo.com",
+    "cxense.com",
+    "datadoghq-browser-agent.com",
+    "dotmetrics.net",
+    "doubleclick.net",
+    "doubleverify.com",
+    "edigitalsurvey.com",
+    "engsvc.go.com",
+    "fls-na.amazon.com",
+    "go-mpulse.net",
+    "googlesyndication.com",
+    "googletagmanager.com",
+    "imrworldwide.com",
+    "ipredictive.com",
+    "kochava.com",
+    "media.net",
+    "nr-data.net",
+    "omtrdc.net",
+    "openx.net",
+    "opin.media",
+    "optimizationguide-pa.googleapis",
+    "optimizely.com",
+    "permutive.com",
+    "piano.io",
+    "privacymanager.io",
+    "privacy-mgmt.com",
+    "pubmatic.com",
+    "qualtrics.com",
+    "quantummetric.com",
+    "registerdisney.go.com",
+    "rubiconproject.com",
+    "scorecardresearch.com",
+    "taboola.com",
+    "tealiumiq.com",
+    "the-ozone-project.com",
+    "tinypass.com",
+    "tiqcdn.com",
+    "tremorhub.com",
+    "zemanta.com",
+]
+
+
 async def init(location: str = "", hostname: str = "") -> Handle:
     global playwright_instance, browser_instance
 
@@ -133,6 +190,16 @@ async def init(location: str = "", hostname: str = "") -> Handle:
     )
 
     page = context.pages[0] if context.pages else await context.new_page()
+    await page.route(
+        "**/*",
+        lambda route: asyncio.create_task(
+            route.abort()
+            if route.request.resource_type in ["media", "font"]
+            or any(domain in route.request.url for domain in BLOCKED_DOMAINS)
+            else route.continue_()
+        ),
+    )
+
     return {"id": id, "hostname": hostname, "location": location, "context": context, "page": page}
 
 

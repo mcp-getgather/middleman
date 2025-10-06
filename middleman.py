@@ -119,6 +119,68 @@ class Handle(TypedDict):
     page: Page
 
 
+BLOCKED_DOMAINS = [
+    "3lift.com",
+    "adnxs.com",
+    "adobedtm.com",
+    "adsrvr.org",
+    "amazon-adsystem.com",
+    "amplitude.com",
+    "appboy.com",
+    "bamgrid.com",
+    "bluekai.com",
+    "bounceexchange.com",
+    "brandmetrics.com",
+    "casalamedia.com",
+    "consentmanager.net",
+    "cookielaw.org",
+    "covatic.io",
+    "criteo.com",
+    "cxense.com",
+    "datadoghq-browser-agent.com",
+    "dotmetrics.net",
+    "doubleclick.net",
+    "doubleverify.com",
+    "edigitalsurvey.com",
+    "engsvc.go.com",
+    "fls-na.amazon.com",
+    "go-mpulse.net",
+    "googlesyndication.com",
+    "googletagmanager.com",
+    "imrworldwide.com",
+    "ipredictive.com",
+    "kochava.com",
+    "media.net",
+    "mgid.com",
+    "nr-data.net",
+    "omtrdc.net",
+    "openx.net",
+    "opin.media",
+    "optimizationguide-pa.googleapis",
+    "optimizely.com",
+    "permutive.com",
+    "piano.io",
+    "privacymanager.io",
+    "privacy-mgmt.com",
+    "pubmatic.com",
+    "qualtrics.com",
+    "quantummetric.com",
+    "registerdisney.go.com",
+    "rubiconproject.com",
+    "scorecardresearch.com",
+    "serving-sys.com",
+    "sovrn.com",
+    "taboola.com",
+    "tealiumiq.com",
+    "the-ozone-project.com",
+    "thetradedesk.com",
+    "tinypass.com",
+    "tiqcdn.com",
+    "tremorhub.com",
+    "zemanta.com",
+]
+
+
 async def init(location: str = "", hostname: str = "") -> Handle:
     global playwright_instance, browser_instance
 
@@ -134,6 +196,16 @@ async def init(location: str = "", hostname: str = "") -> Handle:
     )
 
     page = context.pages[0] if context.pages else await context.new_page()
+    await page.route(
+        "**/*",
+        lambda route: asyncio.create_task(
+            route.abort()
+            if route.request.resource_type in ["media", "font"]
+            or any(domain in route.request.url for domain in BLOCKED_DOMAINS)
+            else route.continue_()
+        ),
+    )
+
     return {"id": id, "hostname": hostname, "location": location, "context": context, "page": page}
 
 
@@ -333,6 +405,14 @@ async def autofill(page: Page, distilled: str):
             radio = document.find("input", {"type": "radio", "id": choices[choice - 1]["id"]})
             if radio and isinstance(radio, Tag):
                 selector, frame_selector = get_selector(str(radio.get("gg-match")))
+                if frame_selector:
+                    await page.frame_locator(str(frame_selector)).locator(str(selector)).check()
+                else:
+                    await page.check(str(selector))
+        elif input_type == "checkbox":
+            checked = element.get("checked")
+            if checked is not None:
+                print(f"{CYAN}{ARROW} Checking {BOLD}{name}{NORMAL}")
                 if frame_selector:
                     await page.frame_locator(str(frame_selector)).locator(str(selector)).check()
                 else:
@@ -585,8 +665,21 @@ async def link(id: str, request: Request):
         print()
         print(distilled)
 
-        names: List[str] = []
         document = parse(distilled)
+        title_element = document.find("title")
+        title = title_element.get_text() if title_element else "MIDDLEMAN"
+        action = f"/link/{id}"
+
+        if await terminate(page, distilled):
+            print(f"{GREEN}{CHECK} Finished!{NORMAL}")
+            converted = await convert(page, distilled)
+            await context.close()
+            browsers[:] = [b for b in browsers if b["id"] != id]
+            if converted:
+                return JSONResponse(converted)
+            return HTMLResponse(render(str(document.find("body")), {"title": title, "action": action}))
+
+        names: List[str] = []
         inputs = document.find_all("input")
 
         for input in inputs:
@@ -596,8 +689,18 @@ async def link(id: str, request: Request):
 
                 if selector:
                     if input.get("type") == "checkbox":
-                        names.append(str(name) if name else "checkbox")
-                        print(f"{CYAN}{ARROW} Handling {NORMAL}{selector} using autoclick")
+                        if not name:
+                            print(f"{CROSS}{RED} No name for the checkbox {NORMAL}{selector}")
+                            continue
+                        value = fields.get(str(name))
+                        checked = value and len(str(value)) > 0
+                        names.append(str(name))
+                        print(f"{CYAN}{ARROW} Status of checkbox {BOLD}{name}={checked}{NORMAL}")
+                        if checked:
+                            if frame_selector:
+                                await page.frame_locator(str(frame_selector)).locator(str(selector)).check()
+                            else:
+                                await page.check(str(selector))
                     elif input.get("type") == "radio":
                         value = fields.get(str(name)) if name else None
                         if not value or len(str(value)) == 0:
@@ -634,40 +737,13 @@ async def link(id: str, request: Request):
                         else:
                             print(f"{CROSS}{RED} No form data found for {BOLD}{name}{NORMAL}")
 
-        title_element = document.find("title")
-        title = title_element.get_text() if title_element else "MIDDLEMAN"
-        action = f"/link/{id}"
-
-        is_form_filled = len(names) > 0 and len(inputs) == len(names)
-        has_click_buttons = len(document.find_all(attrs={"gg-autoclick": True})) > 0
-        is_no_form = len(inputs) == 0
-
-        if is_form_filled or (has_click_buttons and is_no_form):
-            await clicks(page, distilled, {"gg-autoclick": True})
-            if is_form_filled:
-                await clicks(page, distilled, {"type": "submit"})
-            if await terminate(page, distilled):
-                print(f"{GREEN}{CHECK} Finished!{NORMAL}")
-                converted = await convert(page, distilled)
-                await context.close()
-                browsers[:] = [b for b in browsers if b["id"] != id]
-                if converted:
-                    return JSONResponse(converted)
-                return HTMLResponse(render(str(document.find("body")), {"title": title, "action": action}))
-
+        await clicks(page, distilled, {"gg-autoclick": True})
+        if len(names) > 0 and len(inputs) == len(names):
+            await clicks(page, distilled, {"type": "submit"})
             print(f"{GREEN}{CHECK} All form fields are filled{NORMAL}")
             continue
 
-        if await terminate(page, distilled):
-            print(f"{GREEN}{CHECK} Finished!{NORMAL}")
-            converted = await convert(page, distilled)
-            await context.close()
-            browsers[:] = [b for b in browsers if b["id"] != id]
-            if converted:
-                return JSONResponse(converted)
-        else:
-            print(f"{CROSS}{RED} Not all form fields are filled{NORMAL}")
-
+        print(f"{CROSS}{RED} Not all form fields are filled{NORMAL}")
         return HTMLResponse(render(str(document.find("body")), {"title": title, "action": action}))
 
     raise HTTPException(status_code=503, detail="Timeout reached")
@@ -765,20 +841,22 @@ async def run_command(location: str):
                 if match["distilled"] == current["distilled"]:
                     print(f"Still the same: {match['name']}")
                 else:
-                    distilled = await autofill(page, match["distilled"])
+                    distilled = match["distilled"]
                     current["name"] = match["name"]
                     current["distilled"] = distilled
                     print()
                     print(distilled)
 
-                    await clicks(page, distilled, {"gg-autoclick": True})
-                    await clicks(page, distilled, {"type": "submit"})
                     if await terminate(page, distilled):
                         converted = await convert(page, distilled)
                         if converted:
                             print()
                             print(converted)
                         break
+
+                    distilled = await autofill(page, match["distilled"])
+                    await clicks(page, distilled, {"gg-autoclick": True})
+                    await clicks(page, distilled, {"type": "submit"})
             else:
                 print(f"{CROSS}{RED} No matched pattern found{NORMAL}")
 

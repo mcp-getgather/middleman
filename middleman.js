@@ -158,6 +158,67 @@ const click = async (page, selector, timeout = 3 * 1000, frame_selector = null) 
   }
 };
 
+const BLOCKED_DOMAINS = [
+  '3lift.com',
+  'adnxs.com',
+  'adobedtm.com',
+  'adsrvr.org',
+  'amazon-adsystem.com',
+  'amplitude.com',
+  'appboy.com',
+  'bamgrid.com',
+  'bluekai.com',
+  'bounceexchange.com',
+  'brandmetrics.com',
+  'casalamedia.com',
+  'consentmanager.net',
+  'cookielaw.org',
+  'covatic.io',
+  'criteo.com',
+  'cxense.com',
+  'datadoghq-browser-agent.com',
+  'dotmetrics.net',
+  'doubleclick.net',
+  'doubleverify.com',
+  'edigitalsurvey.com',
+  'engsvc.go.com',
+  'fls-na.amazon.com',
+  'go-mpulse.net',
+  'googlesyndication.com',
+  'googletagmanager.com',
+  'imrworldwide.com',
+  'ipredictive.com',
+  'kochava.com',
+  'media.net',
+  'mgid.com',
+  'nr-data.net',
+  'omtrdc.net',
+  'openx.net',
+  'opin.media',
+  'optimizationguide-pa.googleapis',
+  'optimizely.com',
+  'permutive.com',
+  'piano.io',
+  'privacymanager.io',
+  'privacy-mgmt.com',
+  'pubmatic.com',
+  'qualtrics.com',
+  'quantummetric.com',
+  'registerdisney.go.com',
+  'rubiconproject.com',
+  'scorecardresearch.com',
+  'serving-sys.com',
+  'sovrn.com',
+  'taboola.com',
+  'tealiumiq.com',
+  'the-ozone-project.com',
+  'thetradedesk.com',
+  'tinypass.com',
+  'tiqcdn.com',
+  'tremorhub.com',
+  'zemanta.com'
+];
+
 const init = async () => {
   const FRIENDLY_CHARS = '23456789abcdefghijkmnpqrstuvwxyz';
   const generator = nanoid.customAlphabet(FRIENDLY_CHARS, 6);
@@ -169,6 +230,19 @@ const init = async () => {
     viewport: { width: 1920, height: 1080 }
   });
   const page = context.pages()[0];
+
+  await page.route('**/*', async (route) => {
+    const request = route.request();
+    const url = request.url();
+    if (['media', 'font'].includes(request.resourceType())) {
+      return await route.abort();
+    }
+    if (BLOCKED_DOMAINS.some((domain) => url.includes(domain))) {
+      return await route.abort();
+    }
+    await route.continue();
+  });
+
   return { id, context, page };
 };
 
@@ -346,6 +420,16 @@ const autofill = async (page, distilled) => {
       } else {
         await page.check(selector);
       }
+    } else if (type === 'checkbox') {
+      const checked = element.getAttribute('checked');
+      if (checked !== null) {
+        console.log(`${CYAN}${ARROW} Checking ${BOLD}${name}${NORMAL}`);
+        if (frame_selector) {
+          await page.frameLocator(frame_selector).locator(selector).check();
+        } else {
+          await page.check(selector);
+        }
+      }
     }
   }
 
@@ -385,7 +469,7 @@ const extractValue = (item, attribute = null) => {
     return typeof value === 'string' ? value.trim() : '';
   }
 
-  return item.textContent.trim();
+  return item?.textContent.trim();
 };
 
 const convert = async (page, distilled) => {
@@ -410,7 +494,9 @@ const convert = async (page, distilled) => {
             kv[name] = Array.from(items).map((item) => extractValue(item, attribute));
           } else {
             const item = el.querySelector(selector);
-            kv[name] = extractValue(item, attribute);
+            if (item) {
+              kv[name] = extractValue(item, attribute);
+            }
           }
         });
         if (Object.keys(kv).length > 0) {
@@ -576,14 +662,12 @@ const render = (content, options = {}) => {
         if (match.distilled === current.distilled) {
           console.log('Still the same:', match.name);
         } else {
-          const distilled = await autofill(page, match.distilled);
+          let distilled = match.distilled;
           current.name = match.name;
           current.distilled = distilled;
           console.log();
           console.log(await prettier.format(distilled, { parser: 'html', printWidth: 120 }));
 
-          await clicks(page, distilled, '[gg-autoclick]');
-          await clicks(page, distilled, '[type="submit"]');
           if (await terminate(page, distilled)) {
             const converted = await convert(page, distilled);
             if (converted) {
@@ -592,6 +676,10 @@ const render = (content, options = {}) => {
             }
             break;
           }
+
+          distilled = await autofill(page, match.distilled);
+          await clicks(page, distilled, '[gg-autoclick]');
+          await clicks(page, distilled, '[type="submit"]');
         }
       } else {
         console.warn(`${CROSS}${RED} No matched pattern found${NORMAL}`);
@@ -717,16 +805,44 @@ const render = (content, options = {}) => {
       console.log();
       console.log(await prettier.format(current.distilled, { parser: 'html', printWidth: 120 }));
 
-      const names = [];
       const document = parse(distilled);
+      const title = document.title;
+      const action = `/link/${id}`;
+
+      if (await terminate(page, distilled)) {
+        console.log(`${GREEN}${CHECK} Finished!${NORMAL}`);
+        const converted = await convert(page, distilled);
+        await context.close();
+        if (converted) {
+          console.log();
+          console.log(converted);
+          return c.json(converted);
+        }
+        return c.html(render(document.body.innerHTML, { title, action }));
+      }
+
+      const names = [];
       const inputs = document.querySelectorAll('input');
       for (const input of inputs) {
         const { selector, frame_selector } = get_selector(input.getAttribute('gg-match'));
         const name = input.name;
         if (selector) {
           if (input.type === 'checkbox') {
-            names.push(name || 'checkbox');
-            console.log(`${CYAN}${ARROW} Handling ${NORMAL}${selector} using autoclick`);
+            if (!name) {
+              console.warn(`${CROSS}${RED} No name for the checkbox ${NORMAL}${selector}`);
+              continue;
+            }
+            const value = fields[name];
+            const checked = value && value.length > 0;
+            names.push(name);
+            console.log(`${CYAN}${ARROW} Status of checkbox ${BOLD}${name}=${checked}${NORMAL}`);
+            if (checked) {
+              if (frame_selector) {
+                await page.frameLocator(frame_selector).locator(selector).check();
+              } else {
+                await page.check(selector);
+              }
+            }
           } else if (input.type === 'radio') {
             const value = fields[name];
             if (!value || value.length === 0) {
@@ -772,47 +888,14 @@ const render = (content, options = {}) => {
         }
       }
 
-      console.log(await prettier.format(current.distilled, { parser: 'html', printWidth: 120 }));
-
-      const title = document.title;
-      const action = `/link/${id}`;
-
-      const is_form_filled = names.length > 0 && inputs.length === names.length;
-      const has_click_buttons = document.querySelectorAll('[gg-autoclick]').length > 0;
-      const is_no_form = inputs.length === 0;
-
-      if (is_form_filled || (has_click_buttons && is_no_form)) {
-        await clicks(page, distilled, '[gg-autoclick]');
-        if (is_form_filled) {
-          await clicks(page, distilled, '[type="submit"]');
-        }
-        if (await terminate(page, distilled)) {
-          console.log(`${GREEN}${CHECK} Finished!${NORMAL}`);
-          const converted = await convert(page, distilled);
-          await context.close();
-          if (converted) {
-            console.log();
-            console.log(converted);
-            return c.json(converted);
-          }
-          return c.html(render(document.body.innerHTML, { title, action }));
-        }
-
+      await clicks(page, distilled, '[gg-autoclick]');
+      if (names.length > 0 && inputs.length === names.length) {
+        await clicks(page, distilled, '[type="submit"]');
         console.log(`${GREEN}${CHECK} All form fields are filled${NORMAL}`);
         continue;
       }
 
-      if (await terminate(page, distilled)) {
-        console.log(`${GREEN}${CHECK} Finished!${NORMAL}`);
-        const converted = await convert(page, distilled);
-        await context.close();
-        if (converted) {
-          return c.json(converted);
-        }
-      } else {
-        console.warn(`${CROSS}${RED} Not all form fields are filled${NORMAL}`);
-      }
-
+      console.warn(`${CROSS}${RED} Not all form fields are filled${NORMAL}`);
       return c.html(render(document.body.innerHTML, { title, action }));
     }
 

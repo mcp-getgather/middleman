@@ -469,7 +469,7 @@ const extractValue = (item, attribute = null) => {
     return typeof value === 'string' ? value.trim() : '';
   }
 
-  return item.textContent.trim();
+  return item?.textContent.trim();
 };
 
 const convert = async (page, distilled) => {
@@ -494,7 +494,9 @@ const convert = async (page, distilled) => {
             kv[name] = Array.from(items).map((item) => extractValue(item, attribute));
           } else {
             const item = el.querySelector(selector);
-            kv[name] = extractValue(item, attribute);
+            if (item) {
+              kv[name] = extractValue(item, attribute);
+            }
           }
         });
         if (Object.keys(kv).length > 0) {

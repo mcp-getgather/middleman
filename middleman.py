@@ -737,10 +737,16 @@ async def link(id: str, request: Request):
                         else:
                             print(f"{CROSS}{RED} No form data found for {BOLD}{name}{NORMAL}")
 
-        await clicks(page, distilled, {"gg-autoclick": True})
-        if len(names) > 0 and len(inputs) == len(names):
-            await clicks(page, distilled, {"type": "submit"})
-            print(f"{GREEN}{CHECK} All form fields are filled{NORMAL}")
+        is_form_filled = len(names) > 0 and len(inputs) == len(names)
+        has_click_buttons = len(document.find_all(attrs={"gg-autoclick": True})) > 0
+
+        if is_form_filled or has_click_buttons:
+            if has_click_buttons:
+                await clicks(page, distilled, {"gg-autoclick": True})
+                print(f"{GREEN}{CHECK} Clicked on click buttons{NORMAL}")
+            if is_form_filled:
+                await clicks(page, distilled, {"type": "submit"})
+                print(f"{GREEN}{CHECK} All form fields are filled{NORMAL}")
             continue
 
         print(f"{CROSS}{RED} Not all form fields are filled{NORMAL}")

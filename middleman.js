@@ -888,10 +888,17 @@ const render = (content, options = {}) => {
         }
       }
 
-      await clicks(page, distilled, '[gg-autoclick]');
-      if (names.length > 0 && inputs.length === names.length) {
-        await clicks(page, distilled, '[type="submit"]');
-        console.log(`${GREEN}${CHECK} All form fields are filled${NORMAL}`);
+      const is_form_filled = names.length > 0 && inputs.length === names.length;
+      const has_click_buttons = document.querySelectorAll('[gg-autoclick]').length > 0;
+      if (is_form_filled || has_click_buttons) {
+        if (has_click_buttons) {
+          await clicks(page, distilled, '[gg-autoclick]');
+          console.log(`${GREEN}${CHECK} Clicked on click buttons${NORMAL}`);
+        }
+        if (is_form_filled) {
+          await clicks(page, distilled, '[type="submit"]');
+          console.log(`${GREEN}${CHECK} All form fields are filled${NORMAL}`);
+        }
         continue;
       }
 

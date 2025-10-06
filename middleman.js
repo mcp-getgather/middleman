@@ -662,13 +662,12 @@ const render = (content, options = {}) => {
         if (match.distilled === current.distilled) {
           console.log('Still the same:', match.name);
         } else {
-          const distilled = await autofill(page, match.distilled);
+          let distilled = match.distilled;
           current.name = match.name;
           current.distilled = distilled;
           console.log();
           console.log(await prettier.format(distilled, { parser: 'html', printWidth: 120 }));
 
-          await autoclick(page, distilled);
           if (await terminate(page, distilled)) {
             const converted = await convert(page, distilled);
             if (converted) {
@@ -677,6 +676,9 @@ const render = (content, options = {}) => {
             }
             break;
           }
+
+          distilled = await autofill(page, match.distilled);
+          await autoclick(page, distilled);
         }
       } else {
         console.warn(`${CROSS}${RED} No matched pattern found${NORMAL}`);
@@ -802,8 +804,23 @@ const render = (content, options = {}) => {
       console.log();
       console.log(await prettier.format(current.distilled, { parser: 'html', printWidth: 120 }));
 
-      const names = [];
       const document = parse(distilled);
+      const title = document.title;
+      const action = `/link/${id}`;
+
+      if (await terminate(page, distilled)) {
+        console.log(`${GREEN}${CHECK} Finished!${NORMAL}`);
+        const converted = await convert(page, distilled);
+        await context.close();
+        if (converted) {
+          console.log();
+          console.log(converted);
+          return c.json(converted);
+        }
+        return c.html(render(document.body.innerHTML, { title, action }));
+      }
+
+      const names = [];
       const inputs = document.querySelectorAll('input');
       for (const input of inputs) {
         const { selector, frame_selector } = get_selector(input.getAttribute('gg-match'));
@@ -870,40 +887,13 @@ const render = (content, options = {}) => {
         }
       }
 
-      console.log(await prettier.format(current.distilled, { parser: 'html', printWidth: 120 }));
-
-      const title = document.title;
-      const action = `/link/${id}`;
-
       if (names.length > 0 && inputs.length === names.length) {
         await autoclick(page, distilled);
-        if (await terminate(page, distilled)) {
-          console.log(`${GREEN}${CHECK} Finished!${NORMAL}`);
-          const converted = await convert(page, distilled);
-          await context.close();
-          if (converted) {
-            console.log();
-            console.log(converted);
-            return c.json(converted);
-          }
-          return c.html(render(document.body.innerHTML, { title, action }));
-        }
-
         console.log(`${GREEN}${CHECK} All form fields are filled${NORMAL}`);
         continue;
       }
 
-      if (await terminate(page, distilled)) {
-        console.log(`${GREEN}${CHECK} Finished!${NORMAL}`);
-        const converted = await convert(page, distilled);
-        await context.close();
-        if (converted) {
-          return c.json(converted);
-        }
-      } else {
-        console.warn(`${CROSS}${RED} Not all form fields are filled${NORMAL}`);
-      }
-
+      console.warn(`${CROSS}${RED} Not all form fields are filled${NORMAL}`);
       return c.html(render(document.body.innerHTML, { title, action }));
     }
 

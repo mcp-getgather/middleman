@@ -438,11 +438,11 @@ const autofill = async (page, distilled) => {
 
 const autoclick = async (page, distilled) => {
   const document = parse(distilled);
-  const buttons = document.querySelectorAll('[gg-autoclick]');
+  const buttons = document.querySelectorAll('[gg-autoclick]:not(button), button[gg-autoclick], button[type="submit"]');
   for (const button of buttons) {
     const { selector, frame_selector } = get_selector(button.getAttribute('gg-match'));
     if (selector) {
-      console.log(`${CYAN}${ARROW} Auto-clicking ${NORMAL}${selector}`);
+      console.log(`${CYAN}${ARROW} Clicking ${NORMAL}${selector}`);
       await click(page, selector, 3 * 1000, frame_selector);
     }
   }
@@ -887,9 +887,12 @@ const render = (content, options = {}) => {
         }
       }
 
-      if (names.length > 0 && inputs.length === names.length) {
+      const is_form_filled = names.length > 0 && inputs.length === names.length;
+      const has_no_form_fields = inputs.length === 0;
+      const has_click_buttons = document.querySelectorAll('[gg-autoclick]').length > 0;
+      if (is_form_filled || (has_click_buttons && has_no_form_fields)) {
         await autoclick(page, distilled);
-        console.log(`${GREEN}${CHECK} All form fields are filled${NORMAL}`);
+        console.log(`${GREEN}${CHECK} Clicked on buttons${NORMAL}`);
         continue;
       }
 

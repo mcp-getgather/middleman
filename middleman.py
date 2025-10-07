@@ -422,15 +422,12 @@ async def autofill(page: Page, distilled: str):
 
 async def autoclick(page: Page, distilled: str):
     document = parse(distilled)
-    buttons = document.find_all(attrs={"gg-autoclick": True})
-
+    buttons = document.select('[gg-autoclick]:not(button), button[gg-autoclick], button[type="submit"]')
     for button in buttons:
         if isinstance(button, Tag):
             selector, frame_selector = get_selector(str(button.get("gg-match")))
             if selector:
-                print(f"{CYAN}{ARROW} Auto-clicking {NORMAL}{selector}")
-                if isinstance(frame_selector, list):
-                    frame_selector = frame_selector[0] if frame_selector else None
+                print(f"{CYAN}{ARROW} Clicking {NORMAL}{selector}")
                 await click(page, str(selector), frame_selector=frame_selector)
 
 
@@ -739,9 +736,13 @@ async def link(id: str, request: Request):
                         else:
                             print(f"{CROSS}{RED} No form data found for {BOLD}{name}{NORMAL}")
 
-        if len(names) > 0 and len(inputs) == len(names):
+        is_form_filled = len(names) > 0 and len(inputs) == len(names)
+        has_no_form_fields = len(inputs) == 0
+        has_click_buttons = len(document.find_all(attrs={"gg-autoclick": True})) > 0
+
+        if is_form_filled or (has_click_buttons and has_no_form_fields):
             await autoclick(page, distilled)
-            print(f"{GREEN}{CHECK} All form fields are filled{NORMAL}")
+            print(f"{GREEN}{CHECK} Clicked on buttons{NORMAL}")
             continue
 
         print(f"{CROSS}{RED} Not all form fields are filled{NORMAL}")

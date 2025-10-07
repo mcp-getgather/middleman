@@ -5,8 +5,7 @@ COPY --from=ghcr.io/astral-sh/uv:0.8.4 /uv /uvx /bin/
 RUN apt-get update -y && apt-get install -y --no-install-recommends \
     curl \
     ca-certificates \
-    xvfb \
-    xauth \
+    tigervnc-standalone-server \
     libnss3 \
     libatk-bridge2.0-0 \
     libgtk-3-0 \
@@ -17,9 +16,10 @@ RUN apt-get update -y && apt-get install -y --no-install-recommends \
     fonts-liberation \
     libu2f-udev \
     libvulkan1 \
-    x11vnc \
+    dbus-x11 \
     jwm \
     x11-apps \
+    xterm \
     novnc \
     websockify \
     && rm -rf /var/lib/apt/lists/*
@@ -41,6 +41,7 @@ RUN $VENV_PATH/bin/patchright install --with-deps chromium
 COPY middleman.py /app/middleman.py
 COPY specs /app/specs/
 COPY entrypoint.sh /app/entrypoint.sh
+COPY .jwmrc /app/.jwmrc
 
 RUN uv sync --no-dev
 

@@ -856,8 +856,7 @@ async def run_command(location: str):
                         break
 
                     distilled = await autofill(page, match["distilled"])
-                    await clicks(page, distilled, {"gg-autoclick": True})
-                    await clicks(page, distilled, {"type": "submit"})
+                    await autoclick(page, distilled)
             else:
                 print(f"{CROSS}{RED} No matched pattern found{NORMAL}")
 

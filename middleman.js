@@ -158,66 +158,25 @@ const click = async (page, selector, timeout = 3 * 1000, frame_selector = null) 
   }
 };
 
-const BLOCKED_DOMAINS = [
-  '3lift.com',
-  'adnxs.com',
-  'adobedtm.com',
-  'adsrvr.org',
-  'amazon-adsystem.com',
-  'amplitude.com',
-  'appboy.com',
-  'bamgrid.com',
-  'bluekai.com',
-  'bounceexchange.com',
-  'brandmetrics.com',
-  'casalamedia.com',
-  'consentmanager.net',
-  'cookielaw.org',
-  'covatic.io',
-  'criteo.com',
-  'cxense.com',
-  'datadoghq-browser-agent.com',
-  'dotmetrics.net',
-  'doubleclick.net',
-  'doubleverify.com',
-  'edigitalsurvey.com',
-  'engsvc.go.com',
-  'fls-na.amazon.com',
-  'go-mpulse.net',
-  'googlesyndication.com',
-  'googletagmanager.com',
-  'imrworldwide.com',
-  'ipredictive.com',
-  'kochava.com',
-  'media.net',
-  'mgid.com',
-  'nr-data.net',
-  'omtrdc.net',
-  'openx.net',
-  'opin.media',
-  'optimizationguide-pa.googleapis',
-  'optimizely.com',
-  'permutive.com',
-  'piano.io',
-  'privacymanager.io',
-  'privacy-mgmt.com',
-  'pubmatic.com',
-  'qualtrics.com',
-  'quantummetric.com',
-  'registerdisney.go.com',
-  'rubiconproject.com',
-  'scorecardresearch.com',
-  'serving-sys.com',
-  'sovrn.com',
-  'taboola.com',
-  'tealiumiq.com',
-  'the-ozone-project.com',
-  'thetradedesk.com',
-  'tinypass.com',
-  'tiqcdn.com',
-  'tremorhub.com',
-  'zemanta.com'
-];
+const collect = (filename) => {
+  try {
+    const content = fs.readFileSync(filename, 'utf-8');
+    const entries = content
+      .split('\n')
+      .map((line) => line.trim())
+      .filter((line) => line.length > 0);
+    console.log(`${GREEN}${CHECK}${NORMAL} Loaded ${MAGENTA}${entries.length} entries${NORMAL} from ${filename}`);
+    return entries;
+  } catch (error) {
+    if (error.code === 'ENOENT') {
+      console.log(`${YELLOW}Warning: ${filename} not found, using empty list${NORMAL}`);
+      return [];
+    } else {
+      console.log(`${RED}Error loading ${filename}: ${error.message}${NORMAL}`);
+      return [];
+    }
+  }
+};
 
 const init = async () => {
   const FRIENDLY_CHARS = '23456789abcdefghijkmnpqrstuvwxyz';
@@ -231,13 +190,14 @@ const init = async () => {
   });
   const page = context.pages()[0];
 
+  const denylist = collect('denylist.txt');
   await page.route('**/*', async (route) => {
     const request = route.request();
     const url = request.url();
     if (['media', 'font'].includes(request.resourceType())) {
       return await route.abort();
     }
-    if (BLOCKED_DOMAINS.some((domain) => url.includes(domain))) {
+    if (denylist.some((domain) => url.includes(domain))) {
       return await route.abort();
     }
     await route.continue();

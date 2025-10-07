@@ -10,7 +10,6 @@ from glob import glob
 from typing import Dict, List, Optional, TypedDict, cast
 
 from bs4 import BeautifulSoup
-from bs4._typing import _StrainableAttributes
 from bs4.element import Tag
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import HTMLResponse, JSONResponse
@@ -421,7 +420,7 @@ async def autofill(page: Page, distilled: str):
     return str(document)
 
 
-async def autoclick(page: Page, distilled: str, attrs: _StrainableAttributes):
+async def autoclick(page: Page, distilled: str):
     document = parse(distilled)
     buttons = document.select('[gg-autoclick]:not(button), button[gg-autoclick], button[type="submit"]')
     for button in buttons:

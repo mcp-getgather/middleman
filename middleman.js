@@ -436,11 +436,11 @@ const autofill = async (page, distilled) => {
   return document.documentElement.outerHTML;
 };
 
-const autoclick = async (page, distilled) => {
+const autoclick = async (page, distilled, expr) => {
   const document = parse(distilled);
-  const buttons = document.querySelectorAll('[gg-autoclick]:not(button), button[gg-autoclick], button[type="submit"]');
-  for (const button of buttons) {
-    const { selector, frame_selector } = get_selector(button.getAttribute('gg-match'));
+  const elements = document.querySelectorAll(expr);
+  for (const el of elements) {
+    const { selector, frame_selector } = get_selector(el.getAttribute('gg-match'));
     if (selector) {
       console.log(`${CYAN}${ARROW} Clicking ${NORMAL}${selector}`);
       await click(page, selector, 3 * 1000, frame_selector);
@@ -678,7 +678,8 @@ const render = (content, options = {}) => {
           }
 
           distilled = await autofill(page, match.distilled);
-          await autoclick(page, distilled);
+          await autoclick(page, distilled, '[gg-autoclick]:not(button)');
+          await autoclick(page, distilled, 'button[gg-autoclick], button[type="submit"]');
         }
       } else {
         console.warn(`${CROSS}${RED} No matched pattern found${NORMAL}`);
@@ -717,7 +718,7 @@ const render = (content, options = {}) => {
     const examples = [
       { title: 'NYT Best Sellers', link: '/start?location=www.nytimes.com/books/best-sellers' },
       { title: 'Slashdot: Most Discussed', link: '/start?location=technology.slashdot.org' },
-      { title: 'Goodreads Bookshelf', link: '/start?location=goodreads.com/signin' },
+      { title: 'Goodreads Bookshelf', link: '/start?location=goodreads.com/review/list' },
       { title: 'BBC Saved Articles', link: '/start?location=bbc.com/saved' },
       { title: 'Amazon Browsing History', link: '/start?location=amazon.com/gp/history' },
       { title: 'Gofood Order History', link: '/start?location=gofood.co.id/en/orders' },
@@ -887,17 +888,18 @@ const render = (content, options = {}) => {
         }
       }
 
-      const is_form_filled = names.length > 0 && inputs.length === names.length;
-      const has_no_form_fields = inputs.length === 0;
-      const has_click_buttons = document.querySelectorAll('[gg-autoclick]').length > 0;
-      if (is_form_filled || (has_click_buttons && has_no_form_fields)) {
-        await autoclick(page, distilled);
-        console.log(`${GREEN}${CHECK} Clicked on buttons${NORMAL}`);
-        continue;
-      }
+      await autoclick(page, distilled, '[gg-autoclick]:not(button)');
 
-      console.warn(`${CROSS}${RED} Not all form fields are filled${NORMAL}`);
-      return c.html(render(document.body.innerHTML, { title, action }));
+      const SUBMIT_BUTTON = 'button[gg-autoclick], button[type="submit"]';
+      if (document.querySelector(SUBMIT_BUTTON)) {
+        if (names.length > 0 && inputs.length === names.length) {
+          console.log(`${GREEN}${CHECK} Submitting form${NORMAL}, all fields are filled...`);
+          await autoclick(page, distilled, SUBMIT_BUTTON);
+          continue;
+        }
+        console.warn(`${CROSS}${RED} Not all form fields are filled${NORMAL}`);
+        return c.html(render(document.body.innerHTML, { title, action }));
+      }
     }
 
     return c.text('Unexpected error', 503);

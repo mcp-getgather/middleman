@@ -436,9 +436,9 @@ const autofill = async (page, distilled) => {
   return document.documentElement.outerHTML;
 };
 
-const clicks = async (page, distilled, attrs) => {
+const autoclick = async (page, distilled) => {
   const document = parse(distilled);
-  const buttons = document.querySelectorAll(attrs);
+  const buttons = document.querySelectorAll('[gg-autoclick]:not(button), button[gg-autoclick], button[type="submit"]');
   for (const button of buttons) {
     const { selector, frame_selector } = get_selector(button.getAttribute('gg-match'));
     if (selector) {
@@ -678,8 +678,7 @@ const render = (content, options = {}) => {
           }
 
           distilled = await autofill(page, match.distilled);
-          await clicks(page, distilled, '[gg-autoclick]');
-          await clicks(page, distilled, '[type="submit"]');
+          await autoclick(page, distilled);
         }
       } else {
         console.warn(`${CROSS}${RED} No matched pattern found${NORMAL}`);
@@ -891,14 +890,8 @@ const render = (content, options = {}) => {
       const is_form_filled = names.length > 0 && inputs.length === names.length;
       const has_click_buttons = document.querySelectorAll('[gg-autoclick]').length > 0;
       if (is_form_filled || has_click_buttons) {
-        if (has_click_buttons) {
-          await clicks(page, distilled, '[gg-autoclick]');
-          console.log(`${GREEN}${CHECK} Clicked on click buttons${NORMAL}`);
-        }
-        if (is_form_filled) {
-          await clicks(page, distilled, '[type="submit"]');
-          console.log(`${GREEN}${CHECK} All form fields are filled${NORMAL}`);
-        }
+        await autoclick(page, distilled);
+        console.log(`${GREEN}${CHECK} Clicked on buttons${NORMAL}`);
         continue;
       }
 

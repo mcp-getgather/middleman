@@ -421,9 +421,9 @@ async def autofill(page: Page, distilled: str):
     return str(document)
 
 
-async def clicks(page: Page, distilled: str, attrs: _StrainableAttributes):
+async def autoclick(page: Page, distilled: str, attrs: _StrainableAttributes):
     document = parse(distilled)
-    buttons = document.find_all(attrs=attrs)
+    buttons = document.select('[gg-autoclick]:not(button), button[gg-autoclick], button[type="submit"]')
     for button in buttons:
         if isinstance(button, Tag):
             selector, frame_selector = get_selector(str(button.get("gg-match")))
@@ -741,12 +741,8 @@ async def link(id: str, request: Request):
         has_click_buttons = len(document.find_all(attrs={"gg-autoclick": True})) > 0
 
         if is_form_filled or has_click_buttons:
-            if has_click_buttons:
-                await clicks(page, distilled, {"gg-autoclick": True})
-                print(f"{GREEN}{CHECK} Clicked on click buttons{NORMAL}")
-            if is_form_filled:
-                await clicks(page, distilled, {"type": "submit"})
-                print(f"{GREEN}{CHECK} All form fields are filled{NORMAL}")
+            await autoclick(page, distilled)
+            print(f"{GREEN}{CHECK} Clicked on buttons{NORMAL}")
             continue
 
         print(f"{CROSS}{RED} Not all form fields are filled{NORMAL}")

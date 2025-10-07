@@ -420,12 +420,12 @@ async def autofill(page: Page, distilled: str):
     return str(document)
 
 
-async def autoclick(page: Page, distilled: str):
+async def autoclick(page: Page, distilled: str, expr: str):
     document = parse(distilled)
-    buttons = document.select('[gg-autoclick]:not(button), button[gg-autoclick], button[type="submit"]')
-    for button in buttons:
-        if isinstance(button, Tag):
-            selector, frame_selector = get_selector(str(button.get("gg-match")))
+    elements = document.select(expr)
+    for el in elements:
+        if isinstance(el, Tag):
+            selector, frame_selector = get_selector(str(el.get("gg-match")))
             if selector:
                 print(f"{CYAN}{ARROW} Clicking {NORMAL}{selector}")
                 await click(page, str(selector), frame_selector=frame_selector)
@@ -736,17 +736,17 @@ async def link(id: str, request: Request):
                         else:
                             print(f"{CROSS}{RED} No form data found for {BOLD}{name}{NORMAL}")
 
-        is_form_filled = len(names) > 0 and len(inputs) == len(names)
-        has_no_form_fields = len(inputs) == 0
-        has_click_buttons = len(document.find_all(attrs={"gg-autoclick": True})) > 0
+        await autoclick(page, distilled, "[gg-autoclick]:not(button)")
 
-        if is_form_filled or (has_click_buttons and has_no_form_fields):
-            await autoclick(page, distilled)
-            print(f"{GREEN}{CHECK} Clicked on buttons{NORMAL}")
-            continue
+        SUBMIT_BUTTON = "button[gg-autoclick], button[type=submit]"
+        if document.select(SUBMIT_BUTTON):
+            if len(names) > 0 and len(inputs) == len(names):
+                print(f"{GREEN}{CHECK} Submitting form{NORMAL}, all fields are filled...")
+                await autoclick(page, distilled, SUBMIT_BUTTON)
+                continue
 
-        print(f"{CROSS}{RED} Not all form fields are filled{NORMAL}")
-        return HTMLResponse(render(str(document.find("body")), {"title": title, "action": action}))
+            print(f"{CROSS}{RED} Not all form fields are filled{NORMAL}")
+            return HTMLResponse(render(str(document.find("body")), {"title": title, "action": action}))
 
     raise HTTPException(status_code=503, detail="Timeout reached")
 
@@ -857,7 +857,8 @@ async def run_command(location: str):
                         break
 
                     distilled = await autofill(page, match["distilled"])
-                    await autoclick(page, distilled)
+                    await autoclick(page, distilled, "[gg-autoclick]:not(button)")
+                    await autoclick(page, distilled, "button[gg-autoclick], button[type=submit]")
             else:
                 print(f"{CROSS}{RED} No matched pattern found{NORMAL}")
 

@@ -737,9 +737,10 @@ async def link(id: str, request: Request):
                             print(f"{CROSS}{RED} No form data found for {BOLD}{name}{NORMAL}")
 
         is_form_filled = len(names) > 0 and len(inputs) == len(names)
+        has_no_form_fields = len(inputs) == 0
         has_click_buttons = len(document.find_all(attrs={"gg-autoclick": True})) > 0
 
-        if is_form_filled or has_click_buttons:
+        if is_form_filled or (has_click_buttons and has_no_form_fields):
             await autoclick(page, distilled)
             print(f"{GREEN}{CHECK} Clicked on buttons{NORMAL}")
             continue

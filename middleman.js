@@ -888,8 +888,9 @@ const render = (content, options = {}) => {
       }
 
       const is_form_filled = names.length > 0 && inputs.length === names.length;
+      const has_no_form_fields = inputs.length === 0;
       const has_click_buttons = document.querySelectorAll('[gg-autoclick]').length > 0;
-      if (is_form_filled || has_click_buttons) {
+      if (is_form_filled || (has_click_buttons && has_no_form_fields)) {
         await autoclick(page, distilled);
         console.log(`${GREEN}${CHECK} Clicked on buttons${NORMAL}`);
         continue;

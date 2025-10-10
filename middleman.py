@@ -118,66 +118,18 @@ class Handle(TypedDict):
     page: Page
 
 
-BLOCKED_DOMAINS = [
-    "3lift.com",
-    "adnxs.com",
-    "adobedtm.com",
-    "adsrvr.org",
-    "amazon-adsystem.com",
-    "amplitude.com",
-    "appboy.com",
-    "bamgrid.com",
-    "bluekai.com",
-    "bounceexchange.com",
-    "brandmetrics.com",
-    "casalamedia.com",
-    "consentmanager.net",
-    "cookielaw.org",
-    "covatic.io",
-    "criteo.com",
-    "cxense.com",
-    "datadoghq-browser-agent.com",
-    "dotmetrics.net",
-    "doubleclick.net",
-    "doubleverify.com",
-    "edigitalsurvey.com",
-    "engsvc.go.com",
-    "fls-na.amazon.com",
-    "go-mpulse.net",
-    "googlesyndication.com",
-    "googletagmanager.com",
-    "imrworldwide.com",
-    "ipredictive.com",
-    "kochava.com",
-    "media.net",
-    "mgid.com",
-    "nr-data.net",
-    "omtrdc.net",
-    "openx.net",
-    "opin.media",
-    "optimizationguide-pa.googleapis",
-    "optimizely.com",
-    "permutive.com",
-    "piano.io",
-    "privacymanager.io",
-    "privacy-mgmt.com",
-    "pubmatic.com",
-    "qualtrics.com",
-    "quantummetric.com",
-    "registerdisney.go.com",
-    "rubiconproject.com",
-    "scorecardresearch.com",
-    "serving-sys.com",
-    "sovrn.com",
-    "taboola.com",
-    "tealiumiq.com",
-    "the-ozone-project.com",
-    "thetradedesk.com",
-    "tinypass.com",
-    "tiqcdn.com",
-    "tremorhub.com",
-    "zemanta.com",
-]
+def collect(filename: str) -> List[str]:
+    try:
+        with open(filename, "r", encoding="utf-8") as f:
+            entries = [line.strip() for line in f if line.strip()]
+        print(f"{GREEN}{CHECK}{NORMAL} Loaded {MAGENTA}{len(entries)} entries{NORMAL} from {filename}")
+        return entries
+    except FileNotFoundError:
+        print(f"{YELLOW}Warning: {filename} not found, using empty list{NORMAL}")
+        return []
+    except Exception as e:
+        print(f"{RED}Error loading {filename}: {e}{NORMAL}")
+        return []
 
 
 async def init(location: str = "", hostname: str = "") -> Handle:
@@ -195,12 +147,13 @@ async def init(location: str = "", hostname: str = "") -> Handle:
     )
 
     page = context.pages[0] if context.pages else await context.new_page()
+    denylist = collect("denylist.txt")
     await page.route(
         "**/*",
         lambda route: asyncio.create_task(
             route.abort()
             if route.request.resource_type in ["media", "font"]
-            or any(domain in route.request.url for domain in BLOCKED_DOMAINS)
+            or any(domain in route.request.url for domain in denylist)
             else route.continue_()
         ),
     )

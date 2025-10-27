@@ -226,6 +226,21 @@ const parse = (html) => {
   return dom.window.document;
 };
 
+async function safeInputValue(locator) {
+  const count = await locator.count();
+  if (count <= 0) {
+    return null;
+  }
+  const el = locator.first();
+  const tag = await el.evaluate((el) => el.tagName.toLowerCase());
+
+  if (['input', 'textarea', 'select'].includes(tag)) {
+    return await el.inputValue();
+  }
+
+  return null;
+}
+
 const distill = async (hostname, page, patterns) => {
   let result = [];
   for (const item of patterns) {
@@ -265,6 +280,11 @@ const distill = async (hostname, page, patterns) => {
           const text = (await source.textContent()).trim();
           if (text.length > 0) {
             target.textContent = text.trim();
+          }
+          const inputValue = await safeInputValue(source);
+          if (inputValue) {
+            target.value = inputValue;
+            target.setAttribute('value', inputValue);
           }
         }
         matches.push(source);

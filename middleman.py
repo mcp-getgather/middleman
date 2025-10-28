@@ -6,8 +6,9 @@ import os
 import re
 import sys
 import urllib.parse
+from dataclasses import dataclass
 from glob import glob
-from typing import Dict, List, Optional, TypedDict, cast
+from typing import Dict, List, Optional, cast
 
 from bs4 import BeautifulSoup
 from bs4.element import Tag
@@ -110,7 +111,8 @@ def parse(html: str):
     return BeautifulSoup(html, "html.parser")
 
 
-class Handle(TypedDict):
+@dataclass
+class Handle:
     id: str
     hostname: str
     location: str
@@ -158,10 +160,11 @@ async def init(location: str = "", hostname: str = "") -> Handle:
         ),
     )
 
-    return {"id": id, "hostname": hostname, "location": location, "context": context, "page": page}
+    return Handle(id=id, hostname=hostname, location=location, context=context, page=page)
 
 
-class Pattern(TypedDict):
+@dataclass
+class Pattern:
     name: str
     pattern: BeautifulSoup
 
@@ -175,7 +178,8 @@ def load_patterns() -> List[Pattern]:
     return patterns
 
 
-class Match(TypedDict):
+@dataclass
+class Match:
     name: str
     priority: int
     distilled: str
@@ -185,8 +189,8 @@ async def distill(hostname: Optional[str], page: Page, patterns: List[Pattern]) 
     result: List[Match] = []
 
     for item in patterns:
-        name = item["name"]
-        pattern = item["pattern"]
+        name = item.name
+        pattern = item.pattern
 
         root = pattern.find("html")
         gg_priority = root.get("gg-priority", "-1") if isinstance(root, Tag) else "-1"
@@ -245,13 +249,15 @@ async def distill(hostname: Optional[str], page: Page, patterns: List[Pattern]) 
 
         if found and match_count > 0:
             distilled = str(pattern)
-            result.append({
-                "name": name,
-                "priority": priority,
-                "distilled": distilled,
-            })
+            result.append(
+                Match(
+                    name=name,
+                    priority=priority,
+                    distilled=distilled,
+                )
+            )
 
-    result = sorted(result, key=lambda x: x["priority"])
+    result = sorted(result, key=lambda x: x.priority)
 
     if len(result) == 0:
         if MIDDLEMAN_DEBUG:
@@ -261,10 +267,10 @@ async def distill(hostname: Optional[str], page: Page, patterns: List[Pattern]) 
         if MIDDLEMAN_DEBUG:
             print(f"Number of matches: {len(result)}")
             for item in result:
-                print(f" - {item['name']} with priority {item['priority']}")
+                print(f" - {item.name} with priority {item.priority}")
 
         match = result[0]
-        print(f"{YELLOW}{CHECK} Best match: {BOLD}{match['name']}{NORMAL}")
+        print(f"{YELLOW}{CHECK} Best match: {BOLD}{match.name}{NORMAL}")
         return match
 
 
@@ -556,8 +562,8 @@ async def start(location: str):
     hostname = urllib.parse.urlparse(location).hostname or ""
 
     handle = await init(location, hostname)
-    id = handle["id"]
-    page = handle["page"]
+    id = handle.id
+    page = handle.page
 
     print(f"{GREEN}{ARROW} Browser launched with generated id: {BOLD}{id}{NORMAL}")
     browsers.append(handle)
@@ -584,13 +590,13 @@ async def start(location: str):
 
 @app.post("/link/{id}", response_class=HTMLResponse)
 async def link(id: str, request: Request):
-    browser = next((b for b in browsers if b["id"] == id), None)
+    browser = next((b for b in browsers if b.id == id), None)
     if not browser:
         raise HTTPException(status_code=404, detail=f"Invalid id: {id}")
 
-    hostname = browser["hostname"]
-    context = browser["context"]
-    page = browser["page"]
+    hostname = browser.hostname
+    context = browser.context
+    page = browser.page
 
     patterns = load_patterns()
 
@@ -615,13 +621,13 @@ async def link(id: str, request: Request):
             print(f"{CROSS}{RED} No matched pattern found{NORMAL}")
             continue
 
-        distilled = match["distilled"]
+        distilled = match.distilled
         if distilled == current["distilled"]:
-            print(f"{ARROW} Still the same: {match['name']}")
+            print(f"{ARROW} Still the same: {match.name}")
             continue
 
-        current["name"] = match["name"]
-        current["distilled"] = match["distilled"]
+        current["name"] = match.name
+        current["distilled"] = match.distilled
         print()
         print(distilled)
 
@@ -634,7 +640,7 @@ async def link(id: str, request: Request):
             print(f"{GREEN}{CHECK} Finished!{NORMAL}")
             converted = await convert(page, distilled)
             await context.close()
-            browsers[:] = [b for b in browsers if b["id"] != id]
+            browsers[:] = [b for b in browsers if b.id != id]
             if converted:
                 return JSONResponse(converted)
             return HTMLResponse(render(str(document.find("body")), {"title": title, "action": action}))
@@ -749,7 +755,7 @@ async def distill_command(location: str, option: Optional[str] = None):
         match = await distill(hostname, page, patterns)
 
         if match:
-            distilled = match["distilled"]
+            distilled = match.distilled
             print()
             print(distilled)
             print()
@@ -775,9 +781,9 @@ async def run_command(location: str):
     patterns = load_patterns()
 
     browser_data = await init(location, hostname)
-    browser_id = browser_data["id"]
-    context = browser_data["context"]
-    page = browser_data["page"]
+    browser_id = browser_data.id
+    context = browser_data.context
+    page = browser_data.page
 
     print(f"Starting browser {browser_id}")
 
@@ -801,11 +807,11 @@ async def run_command(location: str):
 
             match = await distill(hostname, page, patterns)
             if match:
-                if match["distilled"] == current["distilled"]:
-                    print(f"Still the same: {match['name']}")
+                if match.distilled == current["distilled"]:
+                    print(f"Still the same: {match.name}")
                 else:
-                    distilled = match["distilled"]
-                    current["name"] = match["name"]
+                    distilled = match.distilled
+                    current["name"] = match.name
                     current["distilled"] = distilled
                     print()
                     print(distilled)
@@ -817,7 +823,7 @@ async def run_command(location: str):
                             print(converted)
                         break
 
-                    distilled = await autofill(page, match["distilled"])
+                    distilled = await autofill(page, match.distilled)
                     await autoclick(page, distilled, "[gg-autoclick]:not(button)")
                     await autoclick(page, distilled, "button[gg-autoclick], button[type=submit]")
             else:

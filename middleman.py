@@ -518,21 +518,31 @@ async def health() -> dict[str, float | str]:
 
 @app.get("/", response_class=HTMLResponse)
 async def home():
-    examples = [
+    extraction_examples = [
         {"title": "NYT Best Sellers", "link": "/start?location=www.nytimes.com/books/best-sellers"},
         {"title": "Slashdot: Most Discussed", "link": "/start?location=technology.slashdot.org"},
-        {"title": "Goodreads Bookshelf", "link": "/start?location=goodreads.com/signin"},
-        {"title": "BBC Saved Articles", "link": "/start?location=bbc.com/saved"},
-        {"title": "Amazon Browsing History", "link": "/start?location=amazon.com/gp/history"},
-        {"title": "Gofood Order History", "link": "/start?location=gofood.co.id/en/orders"},
-        {"title": "eBird Life List", "link": "/start?location=ebird.org/lifelist"},
-        {"title": "Agoda Booking History", "link": "/start?location=agoda.com/account/bookings.html"},
         {"title": "ESPN College Football Schedule", "link": "/start?location=espn.com/college-football/schedule"},
         {"title": "NBA Key Dates", "link": "/start?location=nba.com/news/key-dates"},
     ]
 
-    items = [f'<li><a href="{item["link"]}" target="_blank">{item["title"]}</a></li>' for item in examples]
-    content = f"<p>Try the following examples:</p><ul>{''.join(items)}</ul>"
+    signin_examples = [
+        {"title": "BBC Saved Articles", "link": "/start?location=bbc.com/saved"},
+        {"title": "Goodreads Bookshelf", "link": "/start?location=goodreads.com/signin"},
+        {"title": "Amazon Browsing History", "link": "/start?location=amazon.com/gp/history"},
+        {"title": "Gofood Order History", "link": "/start?location=gofood.co.id/en/orders"},
+        {"title": "eBird Life List", "link": "/start?location=ebird.org/lifelist"},
+        {"title": "Agoda Booking History", "link": "/start?location=agoda.com/account/bookings.html"},
+    ]
+
+    def itemize(item):
+        return f'<li><a href="{item["link"]}" target="_blank">{item["title"]}</a></li>'
+
+    content = f"""
+    <p>Try these extraction examples:</p>
+    <ul>{"".join(map(itemize, extraction_examples))}</ul>
+    <p>or explore these examples that require sign-in:</p>
+    <ul>{"".join(map(itemize, signin_examples))}</ul>
+    """
 
     return HTMLResponse(render(content))
 

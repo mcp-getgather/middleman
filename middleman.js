@@ -675,20 +675,31 @@ const render = (content, options = {}) => {
   app.get('/health', (c) => c.text(`OK ${Date.now()}`));
 
   app.get('/', (c) => {
-    const examples = [
+    const extractionExamples = [
       { title: 'NYT Best Sellers', link: '/start?location=www.nytimes.com/books/best-sellers' },
       { title: 'Slashdot: Most Discussed', link: '/start?location=technology.slashdot.org' },
-      { title: 'Goodreads Bookshelf', link: '/start?location=goodreads.com/review/list' },
-      { title: 'BBC Saved Articles', link: '/start?location=bbc.com/saved' },
-      { title: 'Amazon Browsing History', link: '/start?location=amazon.com/gp/history' },
-      { title: 'Gofood Order History', link: '/start?location=gofood.co.id/en/orders' },
-      { title: 'Agoda Booking History', link: '/start?location=agoda.com/account/bookings.html' },
       { title: 'ESPN College Football Schedule', link: '/start?location=espn.com/college-football/schedule' },
       { title: 'NBA Key Dates', link: '/start?location=nba.com/news/key-dates' }
     ];
 
-    const itemize = ({ title, link }) => `<li><a href="${link}" target="_blank">${title}</a></li>`;
-    const content = `<p>Try the following examples:</p><ul>${examples.map(itemize).join('\n')}</ul>`;
+    const signinExamples = [
+      { title: 'BBC Saved Articles', link: '/start?location=bbc.com/saved' },
+      { title: 'Goodreads Bookshelf', link: '/start?location=goodreads.com/signin' },
+      { title: 'Amazon Browsing History', link: '/start?location=amazon.com/gp/history' },
+      { title: 'Gofood Order History', link: '/start?location=gofood.co.id/en/orders' },
+      { title: 'eBird Life List', link: '/start?location=ebird.org/lifelist' },
+      { title: 'Agoda Booking History', link: '/start?location=agoda.com/account/bookings.html' }
+    ];
+
+    const itemize = (item) => `<li><a href="${item.link}" target="_blank">${item.title}</a></li>`;
+
+    const content = `
+    <p>Try these extraction examples:</p>
+    <ul>${extractionExamples.map(itemize).join('')}</ul>
+    <p>or explore these examples that require sign-in:</p>
+    <ul>${signinExamples.map(itemize).join('')}</ul>
+    `;
+
     return c.html(render(content));
   });
 

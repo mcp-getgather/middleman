@@ -179,7 +179,6 @@ class Match(TypedDict):
     name: str
     priority: int
     distilled: str
-    matches: List[Locator]
 
 
 async def distill(hostname: Optional[str], page: Page, patterns: List[Pattern]) -> Optional[Match]:
@@ -207,7 +206,7 @@ async def distill(hostname: Optional[str], page: Page, patterns: List[Pattern]) 
         print(f"Checking {name} with priority {priority}")
 
         found = True
-        matches: List[Locator] = []
+        match_count = 0
         targets = pattern.find_all(attrs={"gg-match": True}) + pattern.find_all(attrs={"gg-match-html": True})
 
         for target in targets:
@@ -236,7 +235,7 @@ async def distill(hostname: Optional[str], page: Page, patterns: List[Pattern]) 
                     raw_text = await source.text_content()
                     if raw_text:
                         target.string = raw_text.strip()
-                matches.append(source)
+                match_count += 1
             else:
                 optional = target.get("gg-optional") is not None
                 if MIDDLEMAN_DEBUG and optional:
@@ -244,13 +243,12 @@ async def distill(hostname: Optional[str], page: Page, patterns: List[Pattern]) 
                 if not optional:
                     found = False
 
-        if found and len(matches) > 0:
+        if found and match_count > 0:
             distilled = str(pattern)
             result.append({
                 "name": name,
                 "priority": priority,
                 "distilled": distilled,
-                "matches": matches,
             })
 
     result = sorted(result, key=lambda x: x["priority"])

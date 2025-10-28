@@ -246,7 +246,7 @@ const distill = async (hostname, page, patterns) => {
     console.log('Checking', name, 'with priority', priority);
 
     let found = true;
-    const matches = [];
+    let match_count = 0;
     const targets = pattern.querySelectorAll('[gg-match], [gg-match-html]');
     for (const target of targets) {
       const html = target.hasAttribute('gg-match-html');
@@ -267,7 +267,7 @@ const distill = async (hostname, page, patterns) => {
             target.textContent = text.trim();
           }
         }
-        matches.push(source);
+        match_count++;
       } else {
         const optional = target.hasAttribute('gg-optional');
         MIDDLEMAN_DEBUG && optional && console.log(`${GRAY}Optional ${selector} has no match${NORMAL}`);
@@ -278,9 +278,9 @@ const distill = async (hostname, page, patterns) => {
       }
     }
 
-    if (found && matches.length > 0) {
+    if (found && match_count > 0) {
       const distilled = pattern.documentElement.outerHTML;
-      result.push({ name, priority, distilled, matches });
+      result.push({ name, priority, distilled });
     }
   }
 

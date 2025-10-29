@@ -267,16 +267,11 @@ const distill = async (hostname, page, patterns) => {
             target.textContent = text.trim();
           }
 
-          const count = await locator.count();
-          if (count > 0) {
-            const el = locator.first();
-            const tag = await el.evaluate((el) => el.tagName.toLowerCase());
-
-            if (['input', 'textarea', 'select'].includes(tag)) {
-              const inputValue = await el.inputValue();
-              target.value = inputValue;
-              target.setAttribute('value', inputValue);
-            }
+          const tag = await source.evaluate((el) => el.tagName.toLowerCase());
+          if (['input', 'textarea', 'select'].includes(tag)) {
+            const inputValue = await source.inputValue();
+            target.value = inputValue;
+            target.setAttribute('value', inputValue);
           }
         }
         match_count++;

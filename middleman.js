@@ -28,6 +28,8 @@ const ARROW = '⇢';
 const CHECK = '✓';
 const CROSS = '✘';
 
+const PASSWORD_MASK = '******';
+
 const sleep = async (seconds) => await new Promise((resolve) => setTimeout(resolve, seconds * 1000.0));
 
 const pause = async () => {
@@ -226,6 +228,21 @@ const parse = (html) => {
   return dom.window.document;
 };
 
+async function safeInputValue(locator) {
+  const count = await locator.count();
+  if (count <= 0) {
+    return null;
+  }
+  const el = locator.first();
+  const tag = await el.evaluate((el) => el.tagName.toLowerCase());
+
+  if (['input', 'textarea', 'select'].includes(tag)) {
+    return await el.inputValue();
+  }
+
+  return null;
+}
+
 const distill = async (hostname, page, patterns) => {
   let result = [];
   for (const item of patterns) {
@@ -265,6 +282,11 @@ const distill = async (hostname, page, patterns) => {
           const text = (await source.textContent()).trim();
           if (text.length > 0) {
             target.textContent = text.trim();
+          }
+          const inputValue = await safeInputValue(source);
+          if (inputValue) {
+            target.value = inputValue;
+            target.setAttribute('value', target.getAttribute('type') === 'password' ? PASSWORD_MASK : inputValue);
           }
         }
         match_count++;
@@ -334,7 +356,8 @@ const autofill = async (page, distilled) => {
         } else {
           await page.fill(selector, value);
         }
-        element.setAttribute('value', value);
+
+        element.setAttribute('value', type === 'password' ? PASSWORD_MASK : value);
       } else {
         const placeholder = element.getAttribute('placeholder');
         const prompt = placeholder || `Please enter ${field}`;
@@ -345,7 +368,7 @@ const autofill = async (page, distilled) => {
         } else {
           await page.fill(selector, value);
         }
-        element.setAttribute('value', value);
+        element.setAttribute('value', type === 'password' ? PASSWORD_MASK : value);
       }
       await sleep(0.25);
     } else if (type === 'radio') {
@@ -849,7 +872,7 @@ const render = (content, options = {}) => {
               } else {
                 await page.fill(selector, value);
               }
-              input.setAttribute('value', value);
+              input.setAttribute('value', type === 'password' ? PASSWORD_MASK : value);
               current.distilled = document.documentElement.outerHTML;
               delete fields[name];
               await sleep(0.25);

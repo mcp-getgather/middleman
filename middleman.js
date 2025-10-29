@@ -267,6 +267,13 @@ const distill = async (hostname, page, patterns) => {
           if (text.length > 0) {
             target.textContent = text.trim();
           }
+
+          const tag = await source.evaluate((el) => el.tagName.toLowerCase());
+          if (['input', 'textarea', 'select'].includes(tag)) {
+            const inputValue = await source.inputValue();
+            target.value = inputValue;
+            target.setAttribute('value', inputValue);
+          }
         }
         match_count++;
       } else {

@@ -142,10 +142,12 @@ async def init(location: str = "", hostname: str = "") -> Handle:
 
     if not playwright_instance:
         playwright_instance = await async_playwright().start()
-        browser_instance = await playwright_instance.chromium.launch(headless=False, channel="chromium")
+        browser_instance = await playwright_instance.chromium.launch(
+            headless=False, channel="chromium", ignore_default_args=["--no-sandbox"]
+        )
 
     context = await playwright_instance.chromium.launch_persistent_context(  # type: ignore
-        directory, headless=False, viewport={"width": 1920, "height": 1080}
+        directory, headless=False, viewport={"width": 1920, "height": 1080}, ignore_default_args=["--no-sandbox"]
     )
 
     page = context.pages[0] if context.pages else await context.new_page()
@@ -734,7 +736,7 @@ async def distill_command(location: str, option: str | None = None):
     async with async_playwright() as p:
         if location.startswith("http"):
             hostname = urllib.parse.urlparse(location).hostname
-            browser = await p.chromium.launch(headless=False, channel="chromium")
+            browser = await p.chromium.launch(headless=False, channel="chromium", ignore_default_args=["--no-sandbox"])
             context = await browser.new_context()
             page = await context.new_page()
 
@@ -744,7 +746,7 @@ async def distill_command(location: str, option: str | None = None):
             await page.goto(location)
         else:
             hostname = option or ""
-            browser = await p.chromium.launch(headless=False, channel="chromium")
+            browser = await p.chromium.launch(headless=False, channel="chromium", ignore_default_args=["--no-sandbox"])
             context = await browser.new_context()
             page = await context.new_page()
 
@@ -844,7 +846,9 @@ async def inspect_command(browser_id: str, option: str | None = None):
     directory = f"user-data-dir/{browser_id}"
 
     async with async_playwright() as p:
-        context = await p.chromium.launch_persistent_context(directory, headless=False)
+        context = await p.chromium.launch_persistent_context(
+            directory, headless=False, ignore_default_args=["--no-sandbox"]
+        )
         page = context.pages[0] if context.pages else await context.new_page()
 
         if option and len(option) > 0:

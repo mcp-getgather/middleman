@@ -36,6 +36,7 @@ ENV UV_FROZEN=1
 RUN uv sync --no-dev --no-install-workspace
 
 ENV PLAYWRIGHT_SKIP_VALIDATE_HOST_REQUIREMENTS=1
+ENV PLAYWRIGHT_BROWSERS_PATH=/opt/ms-playwright
 RUN $VENV_PATH/bin/patchright install --with-deps chromium
 
 COPY middleman.py /app/middleman.py
@@ -52,5 +53,12 @@ EXPOSE 3000
 RUN cp /usr/share/novnc/vnc_lite.html /usr/share/novnc/index.html
 RUN sed -i 's/rfb.scaleViewport = readQueryVariable.*$/rfb.scaleViewport = true;/' /usr/share/novnc/index.html
 EXPOSE 3001
+
+RUN useradd -m -s /bin/bash middleman && \
+    chown -R middleman:middleman /app && \
+    usermod -aG sudo middleman && \
+    echo 'middleman ALL=(ALL) NOPASSWD:ALL' >> /etc/sudoers
+
+USER middleman
 
 ENTRYPOINT ["/app/entrypoint.sh"]

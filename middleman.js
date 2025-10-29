@@ -186,7 +186,8 @@ const init = async () => {
   const context = await chromium.launchPersistentContext(directory, {
     headless: false,
     channel: 'chromium',
-    viewport: { width: 1920, height: 1080 }
+    viewport: { width: 1920, height: 1080 },
+    ignoreDefaultArgs: ['--no-sandbox']
   });
   const page = context.pages()[0];
 
@@ -552,7 +553,8 @@ const render = (content, options = {}) => {
       context = await chromium.launch({
         headless: false,
         channel: 'chromium',
-        viewport: { width: 1920, height: 1080 }
+        viewport: { width: 1920, height: 1080 },
+        ignoreDefaultArgs: ['--no-sandbox']
       });
       page = await context.newPage();
       MIDDLEMAN_PAUSE && (await pause());
@@ -563,7 +565,8 @@ const render = (content, options = {}) => {
         javascriptEnabled: false,
         headless: false,
         channel: 'chromium',
-        viewport: { width: 1920, height: 1080 }
+        viewport: { width: 1920, height: 1080 },
+        ignoreDefaultArgs: ['--no-sandbox']
       });
       page = await context.newPage();
       await page.setContent(fs.readFileSync(location, 'utf-8'));
@@ -658,7 +661,8 @@ const render = (content, options = {}) => {
   if (command === 'inspect' && parameter) {
     const directory = `user-data-dir/${parameter}`;
     const context = await chromium.launchPersistentContext(directory, {
-      headless: false
+      headless: false,
+      ignoreDefaultArgs: ['--no-sandbox']
     });
     const page = context.pages()[0];
     if (option && option.length > 0) {

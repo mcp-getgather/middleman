@@ -8,7 +8,7 @@ import sys
 import urllib.parse
 from dataclasses import dataclass
 from glob import glob
-from typing import Dict, List, Optional, cast
+from typing import cast
 
 from bs4 import BeautifulSoup
 from bs4.element import Tag
@@ -56,14 +56,14 @@ def get_selector(input_selector: str):
     return match.group(2), match.group(1)
 
 
-async def ask(message: str, mask: Optional[str] = None) -> str:
+async def ask(message: str, mask: str | None = None) -> str:
     if mask:
         return pwinput.pwinput(f"{message}: ", mask=mask)
     else:
         return input(f"{message}: ")
 
 
-async def locate(locator: Locator) -> Optional[Locator]:
+async def locate(locator: Locator) -> Locator | None:
     count = await locator.count()
     if count > 0:
         for i in range(count):
@@ -99,8 +99,8 @@ async def click(page: Page, selector: str, timeout: int = 3000, frame_selector: 
         raise e
 
 
-def search(directory: str) -> List[str]:
-    results: List[str] = []
+def search(directory: str) -> list[str]:
+    results: list[str] = []
     for root, _, files in os.walk(directory):
         for file in files:
             results.append(os.path.join(root, file))
@@ -120,7 +120,7 @@ class Handle:
     page: Page
 
 
-def collect(filename: str) -> List[str]:
+def collect(filename: str) -> list[str]:
     try:
         with open(filename, "r", encoding="utf-8") as f:
             entries = [line.strip() for line in f if line.strip()]
@@ -169,8 +169,8 @@ class Pattern:
     pattern: BeautifulSoup
 
 
-def load_patterns() -> List[Pattern]:
-    patterns: List[Pattern] = []
+def load_patterns() -> list[Pattern]:
+    patterns: list[Pattern] = []
     for name in glob("./patterns/*.html"):
         with open(name, "r", encoding="utf-8") as f:
             content = f.read()
@@ -185,8 +185,8 @@ class Match:
     distilled: str
 
 
-async def distill(hostname: Optional[str], page: Page, patterns: List[Pattern]) -> Optional[Match]:
-    result: List[Match] = []
+async def distill(hostname: str | None, page: Page, patterns: list[Pattern]) -> Match | None:
+    result: list[Match] = []
 
     for item in patterns:
         name = item.name
@@ -424,7 +424,7 @@ async def convert(page: Page, distilled: str):
             for i, el in enumerate(rows):
                 if MIDDLEMAN_DEBUG:
                     print(f" Converting row {GREEN}{i + 1}{NORMAL} of {len(rows)}")
-                kv: Dict[str, str | list[str]] = {}
+                kv: dict[str, str | list[str]] = {}
                 for col in converter.get("columns", []):
                     name = col.get("name")
                     selector = col.get("selector")
@@ -449,7 +449,7 @@ async def convert(page: Page, distilled: str):
             print(f"{RED}Conversion error:{NORMAL}", str(error))
 
 
-def render(content: str, options: Optional[Dict[str, str]] = None) -> str:
+def render(content: str, options: dict[str, str] | None = None) -> str:
     if options is None:
         options = {}
 
@@ -507,7 +507,7 @@ def render(content: str, options: Optional[Dict[str, str]] = None) -> str:
 </html>"""
 
 
-browsers: List[Handle] = []
+browsers: list[Handle] = []
 playwright_instance = None
 browser_instance = None
 
@@ -645,7 +645,7 @@ async def link(id: str, request: Request):
                 return JSONResponse(converted)
             return HTMLResponse(render(str(document.find("body")), {"title": title, "action": action}))
 
-        names: List[str] = []
+        names: list[str] = []
         inputs = document.find_all("input")
 
         for input in inputs:
@@ -725,7 +725,7 @@ async def list_command():
         print(os.path.basename(name))
 
 
-async def distill_command(location: str, option: Optional[str] = None):
+async def distill_command(location: str, option: str | None = None):
     patterns = load_patterns()
 
     print(f"Distilling {location}")
@@ -839,7 +839,7 @@ async def run_command(location: str):
         print("Terminated.")
 
 
-async def inspect_command(browser_id: str, option: Optional[str] = None):
+async def inspect_command(browser_id: str, option: str | None = None):
     directory = f"user-data-dir/{browser_id}"
 
     async with async_playwright() as p:

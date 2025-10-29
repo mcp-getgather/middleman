@@ -39,7 +39,7 @@ ENV PLAYWRIGHT_SKIP_VALIDATE_HOST_REQUIREMENTS=1
 RUN $VENV_PATH/bin/patchright install --with-deps chromium
 
 COPY middleman.py /app/middleman.py
-COPY specs /app/specs/
+COPY patterns /app/patterns/
 COPY entrypoint.sh /app/entrypoint.sh
 COPY .jwmrc /app/.jwmrc
 

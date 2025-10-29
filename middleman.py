@@ -171,7 +171,7 @@ class Pattern:
 
 def load_patterns() -> List[Pattern]:
     patterns: List[Pattern] = []
-    for name in glob("./specs/**/*.html", recursive=True):
+    for name in glob("./patterns/*.html"):
         with open(name, "r", encoding="utf-8") as f:
             content = f.read()
         patterns.append(Pattern(name=name, pattern=parse(content)))
@@ -719,8 +719,7 @@ async def link(id: str, request: Request):
 
 
 async def list_command():
-    spec_files = glob("./specs/**/*", recursive=True)
-    spec_files = [f for f in spec_files if f.endswith(".html")]
+    spec_files = glob("./patterns/*.html")
 
     for name in spec_files:
         print(os.path.basename(name))

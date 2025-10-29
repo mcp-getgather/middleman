@@ -261,7 +261,7 @@ const distill = async (hostname, page, patterns) => {
     console.log('Checking', name, 'with priority', priority);
 
     let found = true;
-    const matches = [];
+    let match_count = 0;
     const targets = pattern.querySelectorAll('[gg-match], [gg-match-html]');
     for (const target of targets) {
       const html = target.hasAttribute('gg-match-html');
@@ -287,7 +287,7 @@ const distill = async (hostname, page, patterns) => {
             target.setAttribute('value', inputValue);
           }
         }
-        matches.push(source);
+        match_count++;
       } else {
         const optional = target.hasAttribute('gg-optional');
         MIDDLEMAN_DEBUG && optional && console.log(`${GRAY}Optional ${selector} has no match${NORMAL}`);
@@ -298,9 +298,9 @@ const distill = async (hostname, page, patterns) => {
       }
     }
 
-    if (found && matches.length > 0) {
+    if (found && match_count > 0) {
       const distilled = pattern.documentElement.outerHTML;
-      result.push({ name, priority, distilled, matches });
+      result.push({ name, priority, distilled });
     }
   }
 
@@ -695,20 +695,31 @@ const render = (content, options = {}) => {
   app.get('/health', (c) => c.text(`OK ${Date.now()}`));
 
   app.get('/', (c) => {
-    const examples = [
+    const extractionExamples = [
       { title: 'NYT Best Sellers', link: '/start?location=www.nytimes.com/books/best-sellers' },
       { title: 'Slashdot: Most Discussed', link: '/start?location=technology.slashdot.org' },
-      { title: 'Goodreads Bookshelf', link: '/start?location=goodreads.com/review/list' },
-      { title: 'BBC Saved Articles', link: '/start?location=bbc.com/saved' },
-      { title: 'Amazon Browsing History', link: '/start?location=amazon.com/gp/history' },
-      { title: 'Gofood Order History', link: '/start?location=gofood.co.id/en/orders' },
-      { title: 'Agoda Booking History', link: '/start?location=agoda.com/account/bookings.html' },
       { title: 'ESPN College Football Schedule', link: '/start?location=espn.com/college-football/schedule' },
       { title: 'NBA Key Dates', link: '/start?location=nba.com/news/key-dates' }
     ];
 
-    const itemize = ({ title, link }) => `<li><a href="${link}" target="_blank">${title}</a></li>`;
-    const content = `<p>Try the following examples:</p><ul>${examples.map(itemize).join('\n')}</ul>`;
+    const signinExamples = [
+      { title: 'BBC Saved Articles', link: '/start?location=bbc.com/saved' },
+      { title: 'Goodreads Bookshelf', link: '/start?location=goodreads.com/signin' },
+      { title: 'Amazon Browsing History', link: '/start?location=amazon.com/gp/history' },
+      { title: 'Gofood Order History', link: '/start?location=gofood.co.id/en/orders' },
+      { title: 'eBird Life List', link: '/start?location=ebird.org/lifelist' },
+      { title: 'Agoda Booking History', link: '/start?location=agoda.com/account/bookings.html' }
+    ];
+
+    const itemize = (item) => `<li><a href="${item.link}" target="_blank">${item.title}</a></li>`;
+
+    const content = `
+    <p>Try these extraction examples:</p>
+    <ul>${extractionExamples.map(itemize).join('')}</ul>
+    <p>or explore these examples that require sign-in:</p>
+    <ul>${signinExamples.map(itemize).join('')}</ul>
+    `;
+
     return c.html(render(content));
   });
 

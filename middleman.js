@@ -528,7 +528,7 @@ const render = (content, options = {}) => {
 (async () => {
   const [, , command, parameter, option] = process.argv;
 
-  const patterns = search('./specs')
+  const patterns = search('./patterns')
     .filter((name) => name.endsWith('.html'))
     .map((name) => {
       const content = fs.readFileSync(name, 'utf-8');
@@ -537,7 +537,7 @@ const render = (content, options = {}) => {
     });
 
   if (command === 'list') {
-    patterns.forEach(({ name }) => console.log(name.replace('specs/', '')));
+    patterns.forEach(({ name }) => console.log(name.replace('patterns/', '')));
     return;
   }
 

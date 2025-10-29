@@ -523,6 +523,7 @@ async def health() -> dict[str, float | str]:
 @app.get("/", response_class=HTMLResponse)
 async def home():
     extraction_examples = [
+        {"title": "NPR Headlines", "link": "/start?location=text.npr.org"},
         {"title": "NYT Best Sellers", "link": "/start?location=www.nytimes.com/books/best-sellers"},
         {"title": "Slashdot: Most Discussed", "link": "/start?location=technology.slashdot.org"},
         {"title": "ESPN College Football Schedule", "link": "/start?location=espn.com/college-football/schedule"},

@@ -5,6 +5,7 @@ COPY --from=ghcr.io/astral-sh/uv:0.8.4 /uv /uvx /bin/
 RUN apt-get update -y && apt-get install -y --no-install-recommends \
     curl \
     ca-certificates \
+    chromium \
     tigervnc-standalone-server \
     libnss3 \
     libatk-bridge2.0-0 \
@@ -34,10 +35,6 @@ COPY pyproject.toml uv.lock* ./
 ENV VENV_PATH="/app/.venv"
 ENV UV_FROZEN=1
 RUN uv sync --no-dev --no-install-workspace
-
-ENV PLAYWRIGHT_SKIP_VALIDATE_HOST_REQUIREMENTS=1
-ENV PLAYWRIGHT_BROWSERS_PATH=/opt/ms-playwright
-RUN $VENV_PATH/bin/patchright install --with-deps chromium
 
 COPY middleman.py /app/middleman.py
 COPY patterns /app/patterns/

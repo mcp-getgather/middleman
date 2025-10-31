@@ -1,17 +1,9 @@
 # DEVELOPMENT
 
-For the JavaScript version, use [Node.js](https://nodejs.org) >= 22 and run the following (this will also install Patchright):
-
-```bash
-npm install
-./middleman.js
-```
-
 For the Python version, use [uv](https://docs.astral.sh/uv) and run:
 
 ```bash
 uv sync
-.venv/bin/patchright install chromium
 ./middleman.py
 ```
 
@@ -33,28 +25,28 @@ Open `localhost:3001` to view the containerized desktop live.
 To run a series of automation tasks on a specific location:
 
 ```bash
-./middleman.js run thriftbooks.com/list
-./middleman.js run www.goodreads.com/review
-./middleman.js run www.bbc.com/saved
-./middleman.js run www.amazon.com/gp/history
+./middleman.py run thriftbooks.com/list
+./middleman.py run www.goodreads.com/review
+./middleman.py run www.bbc.com/saved
+./middleman.py run www.amazon.com/gp/history
 ```
 
 After the automation is complete, a unique browser ID will be shown (e.g., `xyz123`). Use this ID to inspect the results:
 
 ```bash
-./middleman.js inspect xyz123
+./middleman.py inspect xyz123
 ```
 
 To perform a simple page distillation on a remote URL:
 
 ```bash
-./middleman.js distill www.goodreads.com/user/sign_in
+./middleman.py distill www.goodreads.com/user/sign_in
 ```
 
 For more elaborate use cases:
 
 ```bash
-MIDDLEMAN_PAUSE=1 MIDDLEMAN_DEBUG=1 ./middleman.js distill thriftbooks.com/list
+MIDDLEMAN_PAUSE=1 MIDDLEMAN_DEBUG=1 ./middleman.py distill thriftbooks.com/list
 ```
 
 - `MIDDLEMAN_PAUSE=1` will pause the process at certain steps to allow for inspection.

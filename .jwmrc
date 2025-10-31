@@ -54,7 +54,7 @@
 
    <!-- Start menu -->
    <RootMenu onroot="1" labeled="true" label="Start">
-      <Program label="Chromium">/opt/ms-playwright/chromium-1169/chrome-linux/chrome --no-sandbox</Program>
+      <Program label="Chromium">/usr/bin/chromium</Program>
       <Program label="Terminal">xterm</Program>
       <Exit label="Shut Down"/>
    </RootMenu>

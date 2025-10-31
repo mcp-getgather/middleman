@@ -2,7 +2,8 @@
   <body>
     <p gg-match=".appleConnectButton">Apple</p>
     <p gg-match=".amazonConnectButton">Amazon</p>
-    <p gg-match="a:has-text('Sign up')">Sign up</p>
-    <p gg-autoclick gg-match=".signInOption a">Email sign-in</p>
+    <!-- <p gg-match="//a[contains(text(), 'Sign up')]">Sign up</p> -->
+    <!-- <p gg-autoclick gg-match="a[href^="https://www.goodreads.com/ap/signin"]'">Email sign-in</p> -->
+    <p gg-autoclick gg-match="span.signInOption a">Email sign-in</p>
   </body>
 </html>

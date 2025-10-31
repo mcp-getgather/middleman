@@ -3,12 +3,12 @@
 import argparse
 import asyncio
 import os
+import random
 import re
 import sys
 import urllib.parse
-from dataclasses import dataclass
 from glob import glob
-from typing import cast
+from dataclasses import dataclass
 
 from bs4 import BeautifulSoup
 from bs4.element import Tag
@@ -16,10 +16,11 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import HTMLResponse, JSONResponse
 import json
 import nanoid
-from patchright.async_api import BrowserContext, Locator, Page, async_playwright
+
 import pwinput
 import uvicorn
 
+import zendriver as zd
 
 MIDDLEMAN_DEBUG = os.getenv("MIDDLEMAN_DEBUG")
 MIDDLEMAN_PAUSE = os.getenv("MIDDLEMAN_PAUSE")
@@ -38,10 +39,6 @@ CHECK = "✓"
 CROSS = "✘"
 
 FRIENDLY_CHARS = "23456789abcdefghijkmnpqrstuvwxyz"
-
-
-async def sleep(seconds: float):
-    await asyncio.sleep(seconds)
 
 
 async def pause():
@@ -63,42 +60,6 @@ async def ask(message: str, mask: str | None = None) -> str:
         return input(f"{message}: ")
 
 
-async def locate(locator: Locator) -> Locator | None:
-    count = await locator.count()
-    if count > 0:
-        for i in range(count):
-            el = locator.nth(i)
-            if await el.is_visible():
-                return el
-    return None
-
-
-async def click(page: Page, selector: str, timeout: int = 3000, frame_selector: str | None = None) -> None:
-    LOCATOR_ALL_TIMEOUT = 100
-    if frame_selector:
-        locator = page.frame_locator(str(frame_selector)).locator(str(selector))
-    else:
-        locator = page.locator(str(selector))
-    try:
-        elements = await locator.all()
-        print(f'Found {len(elements)} elements for selector "{selector}"')
-        for element in elements:
-            print("Checking", element)
-            if await element.is_visible():
-                print("Clicking on", element)
-                try:
-                    await element.click()
-                    return
-                except Exception as err:
-                    print(f"Failed to click on {selector} {element}: {err}")
-    except Exception as e:
-        if timeout > 0 and "TimeoutError" in str(type(e)):
-            print(f"retrying click {selector} {timeout}")
-            await click(page, selector, timeout - LOCATOR_ALL_TIMEOUT, frame_selector)
-            return
-        raise e
-
-
 def search(directory: str) -> list[str]:
     results: list[str] = []
     for root, _, files in os.walk(directory):
@@ -116,8 +77,8 @@ class Handle:
     id: str
     hostname: str
     location: str
-    context: BrowserContext
-    page: Page
+    browser: zd.Browser
+    page: zd.Tab
 
 
 def collect(filename: str) -> list[str]:
@@ -135,34 +96,41 @@ def collect(filename: str) -> list[str]:
 
 
 async def init(location: str = "", hostname: str = "") -> Handle:
-    global playwright_instance, browser_instance
-
     id = nanoid.generate(FRIENDLY_CHARS, 6)
     directory = f"user-data-dir/{id}"
 
-    if not playwright_instance:
-        playwright_instance = await async_playwright().start()
-        browser_instance = await playwright_instance.chromium.launch(
-            headless=False, channel="chromium", ignore_default_args=["--no-sandbox"]
+    browser = await zd.start(user_data_dir=directory)
+    page = await browser.get()
+
+    denylist = collect("denylist.txt")
+
+    async def handle_request(event):
+        resource_type = event.resource_type
+        request_url = event.request.url
+
+        deny_type = resource_type in [
+            zd.cdp.network.ResourceType.MEDIA,
+            zd.cdp.network.ResourceType.FONT,
+        ]
+        deny_url = any(domain in request_url for domain in denylist)
+        should_deny = deny_type or deny_url
+
+        if not should_deny:
+            await page.send(zd.cdp.fetch.continue_request(request_id=event.request_id))
+            return
+
+        if MIDDLEMAN_DEBUG:
+            print(f"{CROSS}{RED} DENY{NORMAL} {request_url}")
+
+        await page.send(
+            zd.cdp.fetch.fail_request(
+                request_id=event.request_id, error_reason=zd.cdp.network.ErrorReason.BLOCKED_BY_CLIENT
+            )
         )
 
-    context = await playwright_instance.chromium.launch_persistent_context(  # type: ignore
-        directory, headless=False, viewport={"width": 1920, "height": 1080}, ignore_default_args=["--no-sandbox"]
-    )
+    page.add_handler(zd.cdp.fetch.RequestPaused, handle_request)
 
-    page = context.pages[0] if context.pages else await context.new_page()
-    denylist = collect("denylist.txt")
-    await page.route(
-        "**/*",
-        lambda route: asyncio.create_task(
-            route.abort()
-            if route.request.resource_type in ["media", "font"]
-            or any(domain in route.request.url for domain in denylist)
-            else route.continue_()
-        ),
-    )
-
-    return Handle(id=id, hostname=hostname, location=location, context=context, page=page)
+    return Handle(id=id, hostname=hostname, location=location, browser=browser, page=page)
 
 
 @dataclass
@@ -187,7 +155,7 @@ class Match:
     distilled: str
 
 
-async def distill(hostname: str | None, page: Page, patterns: list[Pattern]) -> Match | None:
+async def distill(hostname: str | None, page, patterns: list[Pattern]) -> Match | None:
     result: list[Match] = []
 
     for item in patterns:
@@ -219,17 +187,17 @@ async def distill(hostname: str | None, page: Page, patterns: list[Pattern]) -> 
             if not isinstance(target, Tag):
                 continue
 
+            if MIDDLEMAN_DEBUG:
+                print(f"Checking target = {target}")
             html = target.get("gg-match-html")
-            selector, frame_selector = get_selector(str(html if html else target.get("gg-match")))
+            selector, _ = get_selector(str(html if html else target.get("gg-match")))
             if not selector or not isinstance(selector, str):
                 continue
 
-            if frame_selector:
-                source = await locate(page.frame_locator(str(frame_selector)).locator(selector))
-            else:
-                source = await locate(page.locator(selector))
-
+            print(f"Find selector {selector}")
+            source = await page_query_selector(page, selector)
             if source:
+                print(f"{GREEN}Selector {selector} is source {source}{NORMAL}")
                 if html:
                     target.clear()
                     fragment = BeautifulSoup("<div>" + await source.inner_html() + "</div>", "html.parser")
@@ -238,16 +206,14 @@ async def distill(hostname: str | None, page: Page, patterns: list[Pattern]) -> 
                             child.extract()
                             target.append(child)
                 else:
-                    raw_text = await source.text_content()
+                    raw_text = await source.inner_text()
                     if raw_text:
                         target.string = raw_text.strip()
-
-                    tag = await source.evaluate("el => el.tagName.toLowerCase()")
-                    if tag in ["input", "textarea", "select"]:
-                        input_value = await source.input_value()
-                        target["value"] = input_value
+                    if source.tag in ["input", "textarea", "select"]:
+                        target["value"] = source.element.value or ""
                 match_count += 1
             else:
+                print(f"{RED}Selector {selector} has no match{NORMAL}")
                 optional = target.get("gg-optional") is not None
                 if MIDDLEMAN_DEBUG and optional:
                     print(f"{GRAY}Optional {selector} has no match{NORMAL}")
@@ -281,12 +247,12 @@ async def distill(hostname: str | None, page: Page, patterns: list[Pattern]) -> 
         return match
 
 
-async def autofill(page: Page, distilled: str):
+async def autofill(page: zd.Tab, distilled: str):
     document = parse(distilled)
     root = document.find("html")
     domain = None
-    if root:
-        domain = cast(Tag, root).get("gg-domain")
+    if root and isinstance(root, Tag):
+        domain = root.get("gg-domain")
 
     processed = []
 
@@ -300,7 +266,7 @@ async def autofill(page: Page, distilled: str):
         if not name or (isinstance(name, str) and len(name) == 0):
             print(f"{CROSS}{RED} There is an input (of type {input_type}) without a name!{NORMAL}")
 
-        selector, frame_selector = get_selector(str(element.get("gg-match", "")))
+        selector, _ = get_selector(str(element.get("gg-match", "")))
         if not selector:
             print(f"{CROSS}{RED} There is an input (of type {input_type}) without a selector!{NORMAL}")
             continue
@@ -316,22 +282,20 @@ async def autofill(page: Page, distilled: str):
 
             if value and isinstance(value, str) and len(value) > 0:
                 print(f"{CYAN}{ARROW} Using {BOLD}{key}{NORMAL} for {field}{NORMAL}")
-                if frame_selector:
-                    await page.frame_locator(str(frame_selector)).locator(str(selector)).fill(value)
-                else:
-                    await page.fill(str(selector), value)
+                input_element = await page_query_selector(page, str(selector))
+                if input_element:
+                    await input_element.type_text(value)
                 element["value"] = value
             else:
                 placeholder = element.get("placeholder")
                 prompt = str(placeholder) if placeholder else f"Please enter {field}"
                 mask = "*" if input_type == "password" else None
                 user_input = await ask(prompt, mask)
-                if frame_selector:
-                    await page.frame_locator(str(frame_selector)).locator(str(selector)).fill(user_input)
-                else:
-                    await page.fill(str(selector), user_input)
+                input_element = await page_query_selector(page, str(selector))
+                if input_element:
+                    await input_element.type_text(user_input)
                 element["value"] = user_input
-            await sleep(0.25)
+            await asyncio.sleep(0.25)
         elif input_type == "radio":
             if not name:
                 print(f"{CROSS}{RED} There is no name for radio button with id {element.get('id')}!{NORMAL}")
@@ -367,41 +331,136 @@ async def autofill(page: Page, distilled: str):
 
             radio = document.find("input", {"type": "radio", "id": choices[choice - 1]["id"]})
             if radio and isinstance(radio, Tag):
-                selector, frame_selector = get_selector(str(radio.get("gg-match")))
-                if frame_selector:
-                    await page.frame_locator(str(frame_selector)).locator(str(selector)).check()
-                else:
-                    await page.check(str(selector))
+                selector, _ = get_selector(str(radio.get("gg-match")))
+                radio_element = await page_query_selector(page, str(selector))
+                if radio_element:
+                    await radio_element.click()
         elif input_type == "checkbox":
             checked = element.get("checked")
             if checked is not None:
                 print(f"{CYAN}{ARROW} Checking {BOLD}{name}{NORMAL}")
-                if frame_selector:
-                    await page.frame_locator(str(frame_selector)).locator(str(selector)).check()
-                else:
-                    await page.check(str(selector))
+                checkbox_element = await page_query_selector(page, str(selector))
+                if checkbox_element:
+                    await checkbox_element.click()
 
     return str(document)
 
 
-async def autoclick(page: Page, distilled: str, expr: str):
+async def autoclick(page: zd.Tab, distilled: str, expr: str):
     document = parse(distilled)
     elements = document.select(expr)
     for el in elements:
         if isinstance(el, Tag):
-            selector, frame_selector = get_selector(str(el.get("gg-match")))
+            selector, _ = get_selector(str(el.get("gg-match")))
             if selector:
-                print(f"{CYAN}{ARROW} Clicking {NORMAL}{selector}")
-                await click(page, str(selector), frame_selector=frame_selector)
+                target = await page_query_selector(page, selector)
+                if target:
+                    print(f"{CYAN}{ARROW} Clicking {NORMAL}{selector}")
+                    await target.click()
+                else:
+                    print(f"{YELLOW}Warning: {selector} not found, can't click on it")
 
 
-async def terminate(page: Page, distilled: str) -> bool:
+async def terminate(distilled: str) -> bool:
     document = parse(distilled)
     stops = document.find_all(attrs={"gg-stop": True})
     if len(stops) > 0:
         print("Found stop elements, terminating session...")
         return True
     return False
+
+
+class Element:
+    """Wrapper to handle both CSS and XPath selector differences for browser elements."""
+
+    def __init__(self, element: zd.Element, css_selector: str | None = None, xpath_selector: str | None = None):
+        self.element = element
+        self.tag = element.tag
+        self.page = element.tab
+        self.css_selector = css_selector
+        self.xpath_selector = xpath_selector
+
+    async def inner_html(self) -> str:
+        return await self.element.get_html()
+
+    async def inner_text(self) -> str:
+        return self.element.text
+
+    async def click(self) -> None:
+        if self.css_selector:
+            await self.css_click()
+        else:
+            await self.xpath_click()
+        await asyncio.sleep(0.25)
+
+    async def type_text(self, text: str) -> None:
+        await self.element.clear_input()
+        await asyncio.sleep(0.1)
+        for char in text:
+            await self.element.send_keys(char)
+            await asyncio.sleep(random.uniform(0.01, 0.05))
+
+    async def css_click(self) -> None:
+        if not self.css_selector:
+            print(f"{RED}Cannot perform CSS click: no css_selector available{NORMAL}")
+            return
+        print(f"Attempting JavaScript CSS click for {self.css_selector}")
+        try:
+            escaped_selector = self.css_selector.replace("\\", "\\\\").replace('"', '\\"')
+            js_code = f"""
+            (() => {{
+                let element = document.querySelector("{escaped_selector}");
+                if (element) {{ element.click(); return true; }}
+                return false;
+            }})()
+            """
+            result = await self.page.evaluate(js_code)
+            if result:
+                print(f"{GREEN}JavaScript CSS click succeeded for {self.css_selector}{NORMAL}")
+                return
+            else:
+                print(f"{RED}JavaScript CSS click could not find element {self.css_selector}{NORMAL}")
+        except Exception as js_error:
+            print(f"{RED}JavaScript CSS click failed: {js_error}{NORMAL}")
+
+    async def xpath_click(self) -> None:
+        if not self.xpath_selector:
+            print(f"{RED}Cannot perform XPath click: no xpath_selector available{NORMAL}")
+            return
+        print(f"Attempting JavaScript XPath click for {self.xpath_selector}")
+        try:
+            escaped_selector = self.xpath_selector.replace("\\", "\\\\").replace('"', '\\"')
+            js_code = f"""
+            (() => {{
+                let element = document.evaluate("{escaped_selector}", document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null).singleNodeValue;
+                if (element) {{ element.click(); return true; }}
+                return false;
+            }})()
+            """
+            result = await self.page.evaluate(js_code)
+            if result:
+                print(f"{GREEN}JavaScript XPath click succeeded for {self.xpath_selector}{NORMAL}")
+                return
+            else:
+                print(f"{RED}JavaScript XPath click could not find element {self.xpath_selector}{NORMAL}")
+        except Exception as js_error:
+            print(f"{RED}JavaScript XPath click failed: {js_error}{NORMAL}")
+
+
+async def page_query_selector(page: zd.Tab, selector: str, timeout: float = 0) -> Element | None:
+    try:
+        if selector.startswith("//"):
+            elements = await page.xpath(selector, timeout)
+            if elements and len(elements) > 0:
+                return Element(elements[0], xpath_selector=selector)
+            return None
+
+        element = await page.select(selector, timeout=timeout)
+        if element:
+            return Element(element, css_selector=selector)
+        return None
+    except (asyncio.TimeoutError, Exception):
+        return None
 
 
 def extract_value(item: Tag, attribute: str | None = None) -> str:
@@ -413,7 +472,7 @@ def extract_value(item: Tag, attribute: str | None = None) -> str:
     return item.get_text(strip=True)
 
 
-async def convert(page: Page, distilled: str):
+async def convert(distilled: str):
     document = parse(distilled)
     snippet = document.find("script", {"type": "application/json"})
     if snippet:
@@ -515,8 +574,6 @@ def render(content: str, options: dict[str, str] | None = None) -> str:
 
 
 browsers: list[Handle] = []
-playwright_instance = None
-browser_instance = None
 
 
 app = FastAPI()
@@ -529,12 +586,15 @@ async def health() -> dict[str, float | str]:
 
 @app.get("/", response_class=HTMLResponse)
 async def home():
+    def build_example_items(examples: list[dict[str, str]]) -> list[str]:
+        return [f'<li><a href="{item["link"]}" target="_blank">{item["title"]}</a></li>' for item in examples]
+
     extraction_examples = [
         {"title": "NPR Headlines", "link": "/start?location=text.npr.org"},
-        {"title": "NYT Best Sellers", "link": "/start?location=www.nytimes.com/books/best-sellers"},
         {"title": "Slashdot: Most Discussed", "link": "/start?location=technology.slashdot.org"},
         {"title": "ESPN College Football Schedule", "link": "/start?location=espn.com/college-football/schedule"},
         {"title": "NBA Key Dates", "link": "/start?location=nba.com/news/key-dates"},
+        {"title": "NYT Best Sellers", "link": "/start?location=www.nytimes.com/books/best-sellers"},
     ]
 
     signin_examples = [
@@ -550,14 +610,14 @@ async def home():
         },
     ]
 
-    def itemize(item):
-        return f'<li><a href="{item["link"]}" target="_blank">{item["title"]}</a></li>'
+    extraction_items = build_example_items(extraction_examples)
+    signin_items = build_example_items(signin_examples)
 
     content = f"""
     <p>Try these extraction examples:</p>
-    <ul>{"".join(map(itemize, extraction_examples))}</ul>
+    <ul>{"".join(extraction_items)}</ul>
     <p>or explore these examples that require sign-in:</p>
-    <ul>{"".join(map(itemize, signin_examples))}</ul>
+    <ul>{"".join(signin_items)}</ul>
     """
 
     return HTMLResponse(render(content))
@@ -584,7 +644,7 @@ async def start(location: str):
         await pause()
 
     print(f"{GREEN}{ARROW} Navigating to {NORMAL}{location}")
-    await page.goto(location)
+    await page.get(location)
 
     # Since the browser can't redirect from GET to POST,
     # we'll use an auto-submit form to do that.
@@ -602,13 +662,13 @@ async def start(location: str):
 
 @app.post("/link/{id}", response_class=HTMLResponse)
 async def link(id: str, request: Request):
-    browser = next((b for b in browsers if b.id == id), None)
-    if not browser:
+    handle = next((b for b in browsers if b.id == id), None)
+    if not handle:
         raise HTTPException(status_code=404, detail=f"Invalid id: {id}")
 
-    hostname = browser.hostname
-    context = browser.context
-    page = browser.page
+    hostname = handle.hostname
+    browser = handle.browser
+    page = handle.page
 
     patterns = load_patterns()
 
@@ -626,7 +686,7 @@ async def link(id: str, request: Request):
     for iteration in range(max):
         print()
         print(f"{MAGENTA}Iteration {iteration + 1}{NORMAL} of {max}")
-        await sleep(TICK)
+        await asyncio.sleep(TICK)
 
         match = await distill(hostname, page, patterns)
         if not match:
@@ -648,10 +708,10 @@ async def link(id: str, request: Request):
         title = title_element.get_text() if title_element else "MIDDLEMAN"
         action = f"/link/{id}"
 
-        if await terminate(page, distilled):
+        if await terminate(distilled):
             print(f"{GREEN}{CHECK} Finished!{NORMAL}")
-            converted = await convert(page, distilled)
-            await context.close()
+            converted = await convert(distilled)
+            await browser.stop()
             browsers[:] = [b for b in browsers if b.id != id]
             if converted:
                 return JSONResponse(converted)
@@ -660,9 +720,11 @@ async def link(id: str, request: Request):
         if fields.get("button"):
             button = document.find("button", value=str(fields.get("button")))
             if button and isinstance(button, Tag):
-                button_selector, button_frame_selector = get_selector(str(button.get("gg-match")))
-                print(f"{CYAN}{ARROW} Clicking button {BOLD}{button_selector}{NORMAL}")
-                await click(page, str(button_selector), frame_selector=button_frame_selector)
+                button_selector, _ = get_selector(str(button.get("gg-match")))
+                button_element = await page_query_selector(page, str(button_selector))
+                if button_element:
+                    print(f"{CYAN}{ARROW} Clicking button {BOLD}{button_selector}{NORMAL}")
+                    await button_element.click()
                 continue
 
         names: list[str] = []
@@ -670,10 +732,11 @@ async def link(id: str, request: Request):
 
         for input in inputs:
             if isinstance(input, Tag):
-                selector, frame_selector = get_selector(str(input.get("gg-match")))
+                selector, _ = get_selector(str(input.get("gg-match")))
+                element = await page_query_selector(page, selector)
                 name = input.get("name")
 
-                if selector:
+                if selector and element:
                     if input.get("type") == "checkbox":
                         if not name:
                             print(f"{CROSS}{RED} No name for the checkbox {NORMAL}{selector}")
@@ -683,10 +746,7 @@ async def link(id: str, request: Request):
                         names.append(str(name))
                         print(f"{CYAN}{ARROW} Status of checkbox {BOLD}{name}={checked}{NORMAL}")
                         if checked:
-                            if frame_selector:
-                                await page.frame_locator(str(frame_selector)).locator(str(selector)).check()
-                            else:
-                                await page.check(str(selector))
+                            await element.click()
                     elif input.get("type") == "radio":
                         value = fields.get(str(name)) if name else None
                         if not value or len(str(value)) == 0:
@@ -698,15 +758,14 @@ async def link(id: str, request: Request):
                             continue
                         print(f"{CYAN}{ARROW} Handling radio button group {BOLD}{name}{NORMAL}")
                         print(f"{CYAN}{ARROW} Using form data {BOLD}{name}={value}{NORMAL}")
-                        radio_selector, radio_frame_selector = get_selector(str(radio.get("gg-match")))
-                        if radio_frame_selector:
-                            await page.frame_locator(str(radio_frame_selector)).locator(str(radio_selector)).check()
-                        else:
-                            await page.check(str(radio_selector))
+                        radio_selector, _ = get_selector(str(radio.get("gg-match")))
+                        radio_element = await page_query_selector(page, str(radio_selector))
+                        if radio_element:
+                            await radio_element.click()
                         radio["checked"] = "checked"
                         current["distilled"] = str(document)
                         names.append(str(input.get("id")) if input.get("id") else "radio")
-                        await sleep(0.25)
+                        await asyncio.sleep(0.25)
                     elif name:
                         value = fields.get(str(name))
                         if value and len(str(value)) > 0:
@@ -714,12 +773,9 @@ async def link(id: str, request: Request):
                             names.append(str(name))
                             input["value"] = str(value)
                             current["distilled"] = str(document)
-                            if frame_selector:
-                                await page.frame_locator(str(frame_selector)).locator(str(selector)).fill(str(value))
-                            else:
-                                await page.fill(str(selector), str(value))
+                            await element.type_text(str(value))
                             del fields[str(name)]
-                            await sleep(0.25)
+                            await asyncio.sleep(0.25)
                         else:
                             print(f"{CROSS}{RED} No form data found for {BOLD}{name}{NORMAL}")
 
@@ -739,9 +795,7 @@ async def link(id: str, request: Request):
 
 
 async def list_command():
-    spec_files = glob("./patterns/*.html")
-
-    for name in spec_files:
+    for name in glob("./patterns/*.html"):
         print(os.path.basename(name))
 
 
@@ -750,46 +804,40 @@ async def distill_command(location: str, option: str | None = None):
 
     print(f"Distilling {location}")
 
-    async with async_playwright() as p:
-        if location.startswith("http"):
-            hostname = urllib.parse.urlparse(location).hostname
-            browser = await p.chromium.launch(headless=False, channel="chromium", ignore_default_args=["--no-sandbox"])
-            context = await browser.new_context()
-            page = await context.new_page()
-
-            if MIDDLEMAN_PAUSE:
-                await pause()
-
-            await page.goto(location)
-        else:
-            hostname = option or ""
-            browser = await p.chromium.launch(headless=False, channel="chromium", ignore_default_args=["--no-sandbox"])
-            context = await browser.new_context()
-            page = await context.new_page()
-
-            with open(location, "r", encoding="utf-8") as f:
-                content = f.read()
-            await page.set_content(content)
-
-        match = await distill(hostname, page, patterns)
-
-        if match:
-            distilled = match.distilled
-            print()
-            print(distilled)
-            print()
-            if await terminate(page, distilled):
-                print(f"{GREEN}{CHECK} Finished!{NORMAL}")
-                converted = await convert(page, distilled)
-                if converted:
-                    print()
-                    print(converted)
-                    print()
-
+    browser = await zd.start()
+    if location.startswith("http"):
+        hostname = urllib.parse.urlparse(location).hostname
         if MIDDLEMAN_PAUSE:
             await pause()
+        page: zd.Tab = await browser.get(location)
+        await page
+    else:
+        hostname = option or ""
+        page: zd.Tab = await browser.get("about:blank")
+        # TODO: zendriver Tab doesn't have set_content method to load local HTML
+        # with open(location, "r", encoding="utf-8") as f:
+        #     content = f.read()
+        #     await page.set_content(content)
+        await page
 
-        await browser.close()
+    match = await distill(hostname, page, patterns)
+
+    if match:
+        distilled = match.distilled
+        print()
+        print(distilled)
+        print()
+        if await terminate(distilled):
+            print(f"{GREEN}{CHECK} Finished!{NORMAL}")
+            converted = await convert(distilled)
+            if converted:
+                print()
+                print(converted)
+                print()
+
+    if MIDDLEMAN_PAUSE:
+        await pause()
+    await browser.stop()
 
 
 async def run_command(location: str):
@@ -801,16 +849,13 @@ async def run_command(location: str):
 
     browser_data = await init(location, hostname)
     browser_id = browser_data.id
-    context = browser_data.context
-    page = browser_data.page
+    browser = browser_data.browser
 
     print(f"Starting browser {browser_id}")
 
-    if MIDDLEMAN_PAUSE:
-        await pause()
-
     print(f"{GREEN}{ARROW} Navigating to {NORMAL}{location}")
-    await page.goto(location)
+    page = await browser.get(location)
+    await page
 
     TICK = 1  # seconds
     TIMEOUT = 15  # seconds
@@ -822,9 +867,13 @@ async def run_command(location: str):
         for iteration in range(max):
             print()
             print(f"{MAGENTA}Iteration {iteration + 1}{NORMAL} of {max}")
-            await sleep(TICK)
+            await asyncio.sleep(TICK)
 
             match = await distill(hostname, page, patterns)
+
+            # if MIDDLEMAN_PAUSE:
+            #     await pause()
+
             if match:
                 if match.distilled == current["distilled"]:
                     print(f"Still the same: {match.name}")
@@ -835,8 +884,8 @@ async def run_command(location: str):
                     print()
                     print(distilled)
 
-                    if await terminate(page, distilled):
-                        converted = await convert(page, distilled)
+                    if await terminate(distilled):
+                        converted = await convert(distilled)
                         if converted:
                             print()
                             print(converted)
@@ -855,25 +904,18 @@ async def run_command(location: str):
             await pause()
 
     finally:
-        await context.close()
+        await browser.stop()
         print("Terminated.")
 
 
 async def inspect_command(browser_id: str, option: str | None = None):
     directory = f"user-data-dir/{browser_id}"
-
-    async with async_playwright() as p:
-        context = await p.chromium.launch_persistent_context(
-            directory, headless=False, ignore_default_args=["--no-sandbox"]
-        )
-        page = context.pages[0] if context.pages else await context.new_page()
-
-        if option and len(option) > 0:
-            url = option if option.startswith("http") else f"https://{option}"
-            await page.goto(url)
-
-        await pause()
-        await context.close()
+    browser = await zd.start(user_data_dir=directory)
+    page = await browser.get()
+    if option and len(option) > 0:
+        url = option if option.startswith("http") else f"https://{option}"
+        await page.get(url)
+    await pause()
 
 
 async def main():

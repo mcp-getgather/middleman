@@ -649,9 +649,7 @@ const render = (content, options = {}) => {
 
           distilled = await autofill(page, match.distilled);
           await autoclick(page, distilled, '[gg-autoclick]:not(button)');
-          console.log('------- a');
           await autoclick(page, distilled, 'button[gg-autoclick], button[type="submit"]');
-          console.log('------- b');
         }
       } else {
         console.warn(`${CROSS}${RED} No matched pattern found${NORMAL}`);
@@ -892,7 +890,6 @@ const render = (content, options = {}) => {
       const SUBMIT_BUTTON = 'button[gg-autoclick], button[type="submit"]';
       if (document.querySelector(SUBMIT_BUTTON)) {
         if (names.length > 0 && inputs.length === names.length) {
-          console.log('----------');
           console.log(`${GREEN}${CHECK} Submitting form${NORMAL}, all fields are filled...`);
           await autoclick(page, distilled, SUBMIT_BUTTON);
           continue;

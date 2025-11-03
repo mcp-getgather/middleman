@@ -649,7 +649,9 @@ const render = (content, options = {}) => {
 
           distilled = await autofill(page, match.distilled);
           await autoclick(page, distilled, '[gg-autoclick]:not(button)');
+          console.log('------- a');
           await autoclick(page, distilled, 'button[gg-autoclick], button[type="submit"]');
+          console.log('------- b');
         }
       } else {
         console.warn(`${CROSS}${RED} No matched pattern found${NORMAL}`);
@@ -700,7 +702,11 @@ const render = (content, options = {}) => {
       { title: 'Amazon Browsing History', link: '/start?location=amazon.com/gp/history' },
       { title: 'Gofood Order History', link: '/start?location=gofood.co.id/en/orders' },
       { title: 'eBird Life List', link: '/start?location=ebird.org/lifelist' },
-      { title: 'Agoda Booking History', link: '/start?location=agoda.com/account/bookings.html' }
+      { title: 'Agoda Booking History', link: '/start?location=agoda.com/account/bookings.html' },
+      {
+        title: 'Wayfair Order History',
+        link: '/start?location=www.wayfair.com/session/secure/account/order_search.php?'
+      }
     ];
 
     const itemize = (item) => `<li><a href="${item.link}" target="_blank">${item.title}</a></li>`;
@@ -804,6 +810,16 @@ const render = (content, options = {}) => {
         return c.html(render(document.body.innerHTML, { title, action }));
       }
 
+      if (fields.button) {
+        const button = document.querySelector(`button[value="${fields.button}"]:not([gg-autoclick])`);
+        if (button) {
+          const { selector, frame_selector } = get_selector(button.getAttribute('gg-match'));
+          console.log(`${CYAN}${ARROW} Clicking button ${BOLD}${selector}${NORMAL}`);
+          await click(page, selector, 3 * 1000, frame_selector);
+          continue;
+        }
+      }
+
       const names = [];
       const inputs = document.querySelectorAll('input');
       for (const input of inputs) {
@@ -876,6 +892,7 @@ const render = (content, options = {}) => {
       const SUBMIT_BUTTON = 'button[gg-autoclick], button[type="submit"]';
       if (document.querySelector(SUBMIT_BUTTON)) {
         if (names.length > 0 && inputs.length === names.length) {
+          console.log('----------');
           console.log(`${GREEN}${CHECK} Submitting form${NORMAL}, all fields are filled...`);
           await autoclick(page, distilled, SUBMIT_BUTTON);
           continue;

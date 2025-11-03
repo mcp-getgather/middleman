@@ -703,7 +703,7 @@ const render = (content, options = {}) => {
       { title: 'Agoda Booking History', link: '/start?location=agoda.com/account/bookings.html' },
       {
         title: 'Wayfair Order History',
-        link: '/start?location=www.wayfair.com/session/secure/account/order_search.php?'
+        link: '/start?location=www.wayfair.com/session/secure/account/order_search.php'
       }
     ];
 

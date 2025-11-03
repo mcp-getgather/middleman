@@ -544,6 +544,10 @@ async def home():
         {"title": "Gofood Order History", "link": "/start?location=gofood.co.id/en/orders"},
         {"title": "eBird Life List", "link": "/start?location=ebird.org/lifelist"},
         {"title": "Agoda Booking History", "link": "/start?location=agoda.com/account/bookings.html"},
+        {
+            "title": "Wayfair Order History",
+            "link": "/start?location=www.wayfair.com/session/secure/account/order_search.php",
+        },
     ]
 
     def itemize(item):
@@ -652,6 +656,14 @@ async def link(id: str, request: Request):
             if converted:
                 return JSONResponse(converted)
             return HTMLResponse(render(str(document.find("body")), {"title": title, "action": action}))
+
+        if fields.get("button"):
+            button = document.find("button", value=str(fields.get("button")))
+            if button and isinstance(button, Tag):
+                button_selector, button_frame_selector = get_selector(str(button.get("gg-match")))
+                print(f"{CYAN}{ARROW} Clicking button {BOLD}{button_selector}{NORMAL}")
+                await click(page, str(button_selector), frame_selector=button_frame_selector)
+                continue
 
         names: list[str] = []
         inputs = document.find_all("input")

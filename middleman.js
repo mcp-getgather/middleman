@@ -809,7 +809,7 @@ const render = (content, options = {}) => {
       }
 
       if (fields.button) {
-        const button = document.querySelector(`button[value="${fields.button}"]:not([gg-autoclick])`);
+        const button = document.querySelector(`button[value="${fields.button}"]`);
         if (button) {
           const { selector, frame_selector } = get_selector(button.getAttribute('gg-match'));
           console.log(`${CYAN}${ARROW} Clicking button ${BOLD}${selector}${NORMAL}`);

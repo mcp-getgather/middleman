@@ -21,6 +21,7 @@ import pwinput
 import uvicorn
 
 import zendriver as zd
+from zendriver.core.connection import ProtocolException
 
 MIDDLEMAN_DEBUG = os.getenv("MIDDLEMAN_DEBUG")
 MIDDLEMAN_PAUSE = os.getenv("MIDDLEMAN_PAUSE")
@@ -95,42 +96,105 @@ def collect(filename: str) -> list[str]:
         return []
 
 
+async def setup_proxy(username: str, password: str, page: zd.Tab):
+    async def auth_challenge_handler(event: zd.cdp.fetch.AuthRequired):
+        print(f"{CHECK} Supplying proxy authentication...")
+        await page.send(
+            zd.cdp.fetch.continue_with_auth(
+                request_id=event.request_id,
+                auth_challenge_response=zd.cdp.fetch.AuthChallengeResponse(
+                    response="ProvideCredentials",
+                    username=username,
+                    password=password,
+                ),
+            )
+        )
+
+    async def req_paused(event: zd.cdp.fetch.RequestPaused) -> None:
+        await page.send(zd.cdp.fetch.continue_request(request_id=event.request_id))
+
+    page.add_handler(zd.cdp.fetch.RequestPaused, req_paused)  # type: ignore[arg-type]
+    page.add_handler(zd.cdp.fetch.AuthRequired, auth_challenge_handler)  # type: ignore[arg-type]
+    await page.send(zd.cdp.fetch.enable(handle_auth_requests=True))
+
+
 async def init(location: str = "", hostname: str = "") -> Handle:
     id = nanoid.generate(FRIENDLY_CHARS, 6)
     directory = f"user-data-dir/{id}"
 
-    browser = await zd.start(user_data_dir=directory)
-    page = await browser.get()
+    http_proxy = os.getenv("BROWSER_HTTP_PROXY", "")
+    proxy_username = None
+    proxy_password = None
+    proxy_server = None
 
-    denylist = collect("denylist.txt")
+    if http_proxy:
+        parsed = urllib.parse.urlparse(http_proxy)
+        proxy_username = parsed.username
+        proxy_password = parsed.password
+        proxy_server = f"{parsed.scheme}://{parsed.hostname}"  # sans credentials
+        if parsed.port:
+            proxy_server += f":{parsed.port}"
 
-    async def handle_request(event):
-        resource_type = event.resource_type
-        request_url = event.request.url
+    browser = None
+    try:
+        print(f"{CYAN}{ARROW} Starting the browser...{NORMAL}")
+        browser_args: list[str] = []
+        if proxy_server:
+            print(f"Configuring proxy at {MAGENTA}{proxy_server}{NORMAL}...")
+            browser_args.append(f"--proxy-server={proxy_server}")
+        browser = await zd.start(user_data_dir=directory, browser_args=browser_args)
 
-        deny_type = resource_type in [
-            zd.cdp.network.ResourceType.MEDIA,
-            zd.cdp.network.ResourceType.FONT,
-        ]
-        deny_url = any(domain in request_url for domain in denylist)
-        should_deny = deny_type or deny_url
+        page = await browser.get("about:blank")
+        if proxy_username or proxy_password:
+            print("Setting up proxy authentication...")
+            await setup_proxy(proxy_username or "", proxy_password or "", page)
 
-        if not should_deny:
-            await page.send(zd.cdp.fetch.continue_request(request_id=event.request_id))
-            return
+        denylist = collect("denylist.txt")
 
-        if MIDDLEMAN_DEBUG:
-            print(f"{CROSS}{RED} DENY{NORMAL} {request_url}")
+        async def handle_request(event):
+            resource_type = event.resource_type
+            request_url = event.request.url
 
-        await page.send(
-            zd.cdp.fetch.fail_request(
-                request_id=event.request_id, error_reason=zd.cdp.network.ErrorReason.BLOCKED_BY_CLIENT
-            )
-        )
+            deny_type = resource_type in [
+                zd.cdp.network.ResourceType.MEDIA,
+                zd.cdp.network.ResourceType.FONT,
+            ]
+            deny_url = any(domain in request_url for domain in denylist)
+            should_deny = deny_type or deny_url
 
-    page.add_handler(zd.cdp.fetch.RequestPaused, handle_request)
+            if not should_deny:
+                try:
+                    await page.send(zd.cdp.fetch.continue_request(request_id=event.request_id))
+                except ProtocolException as e:
+                    if "Invalid state for continueInterceptedRequest" in str(e):
+                        pass  # Request already processed, ignore
+                    else:
+                        raise
+                return
 
-    return Handle(id=id, hostname=hostname, location=location, browser=browser, page=page)
+            if MIDDLEMAN_DEBUG:
+                print(f"{CROSS}{RED} DENY{NORMAL} {request_url}")
+
+            try:
+                await page.send(
+                    zd.cdp.fetch.fail_request(
+                        request_id=event.request_id, error_reason=zd.cdp.network.ErrorReason.BLOCKED_BY_CLIENT
+                    )
+                )
+            except ProtocolException as e:
+                if "Invalid state for continueInterceptedRequest" in str(e):
+                    pass  # Request already processed, ignore
+                else:
+                    raise
+
+        page.add_handler(zd.cdp.fetch.RequestPaused, handle_request)
+
+        return Handle(id=id, hostname=hostname, location=location, browser=browser, page=page)
+    except Exception as e:
+        print(f"{CROSS}{RED} Fatal ERROR: {e}{NORMAL}")
+        if browser:
+            await browser.stop()
+        raise
 
 
 @dataclass
@@ -643,8 +707,12 @@ async def start(location: str):
     if MIDDLEMAN_PAUSE:
         await pause()
 
-    print(f"{GREEN}{ARROW} Navigating to {NORMAL}{location}")
-    await page.get(location)
+    try:
+        print(f"{GREEN}{ARROW} Navigating to {NORMAL}{location}")
+        await page.get(location)
+    except Exception as e:
+        print(f"{RED}Error navigating to {location}: {e}{NORMAL}")
+        raise HTTPException(status_code=500, detail=f"Navigation failed: {str(e)}")
 
     # Since the browser can't redirect from GET to POST,
     # we'll use an auto-submit form to do that.

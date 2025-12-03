@@ -9,15 +9,6 @@ uv sync
 
 Then open `localhost:3000` and choose one of the examples.
 
-Alternatively, use [Docker](https://docker.com) or [Podman](https://podman.io) to build the container image and run it:
-
-```bash
-docker build -t middleman .
-docker run --rm --name middleman -p 3000:3000 -p 3001:3001 middleman
-```
-
-Then open `localhost:3000` and pick one of the examples.
-
 Open `localhost:3001` to view the containerized desktop live.
 
 ## CLI
@@ -29,12 +20,6 @@ To run a series of automation tasks on a specific location:
 ./middleman.py run www.goodreads.com/review
 ./middleman.py run www.bbc.com/saved
 ./middleman.py run www.amazon.com/gp/history
-```
-
-After the automation is complete, a unique browser ID will be shown (e.g., `xyz123`). Use this ID to inspect the results:
-
-```bash
-./middleman.py inspect xyz123
 ```
 
 To perform a simple page distillation on a remote URL:

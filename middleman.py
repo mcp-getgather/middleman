@@ -6,6 +6,7 @@ import os
 import random
 import re
 import sys
+import urllib.request
 import urllib.parse
 from glob import glob
 from dataclasses import dataclass
@@ -21,7 +22,8 @@ import pwinput
 import uvicorn
 
 import zendriver as zd
-from zendriver.core.connection import ProtocolException
+
+CDP_URL = os.getenv("CDP_URL", "http://127.0.0.1:9222")
 
 MIDDLEMAN_DEBUG = os.getenv("MIDDLEMAN_DEBUG")
 MIDDLEMAN_PAUSE = os.getenv("MIDDLEMAN_PAUSE")
@@ -77,7 +79,6 @@ def parse(html: str):
 class Handle:
     id: str
     hostname: str
-    location: str
     browser: zd.Browser
     page: zd.Tab
 
@@ -96,105 +97,47 @@ def collect(filename: str) -> list[str]:
         return []
 
 
-async def setup_proxy(username: str, password: str, page: zd.Tab):
-    async def auth_challenge_handler(event: zd.cdp.fetch.AuthRequired):
-        print(f"{CHECK} Supplying proxy authentication...")
+async def init(location: str = "", hostname: str = "") -> tuple[str, str, zd.Browser, zd.Tab]:
+    id = nanoid.generate(FRIENDLY_CHARS, 6)
+
+    from urllib.parse import urlparse
+
+    cdp = urlparse(CDP_URL)
+    browser = await zd.Browser.create(host=cdp.hostname, port=cdp.port)
+    page = await browser.get("about:blank", new_tab=True)
+    browsers.append(Handle(id=id, hostname=hostname, browser=browser, page=page))
+
+    denylist = collect("denylist.txt")
+
+    async def handle_request(event):
+        resource_type = event.resource_type
+        request_url = event.request.url
+
+        deny_type = resource_type in [
+            zd.cdp.network.ResourceType.MEDIA,
+            zd.cdp.network.ResourceType.FONT,
+        ]
+        deny_url = any(domain in request_url for domain in denylist)
+        should_deny = deny_type or deny_url
+
+        if not should_deny:
+            await page.send(zd.cdp.fetch.continue_request(request_id=event.request_id))
+            return
+
+        if MIDDLEMAN_DEBUG:
+            print(f"{CROSS}{RED} DENY{NORMAL} {request_url}")
+
         await page.send(
-            zd.cdp.fetch.continue_with_auth(
-                request_id=event.request_id,
-                auth_challenge_response=zd.cdp.fetch.AuthChallengeResponse(
-                    response="ProvideCredentials",
-                    username=username,
-                    password=password,
-                ),
+            zd.cdp.fetch.fail_request(
+                request_id=event.request_id, error_reason=zd.cdp.network.ErrorReason.BLOCKED_BY_CLIENT
             )
         )
 
-    async def req_paused(event: zd.cdp.fetch.RequestPaused) -> None:
-        await page.send(zd.cdp.fetch.continue_request(request_id=event.request_id))
+    page.add_handler(zd.cdp.fetch.RequestPaused, handle_request)
 
-    page.add_handler(zd.cdp.fetch.RequestPaused, req_paused)  # type: ignore[arg-type]
-    page.add_handler(zd.cdp.fetch.AuthRequired, auth_challenge_handler)  # type: ignore[arg-type]
-    await page.send(zd.cdp.fetch.enable(handle_auth_requests=True))
+    await page.get(location)
 
-
-async def init(location: str = "", hostname: str = "") -> Handle:
-    id = nanoid.generate(FRIENDLY_CHARS, 6)
-    directory = f"user-data-dir/{id}"
-
-    http_proxy = os.getenv("BROWSER_HTTP_PROXY", "")
-    proxy_username = None
-    proxy_password = None
-    proxy_server = None
-
-    if http_proxy:
-        parsed = urllib.parse.urlparse(http_proxy)
-        proxy_username = parsed.username
-        proxy_password = parsed.password
-        proxy_server = f"{parsed.scheme}://{parsed.hostname}"  # sans credentials
-        if parsed.port:
-            proxy_server += f":{parsed.port}"
-
-    browser = None
-    try:
-        print(f"{CYAN}{ARROW} Starting the browser...{NORMAL}")
-        browser_args: list[str] = []
-        if proxy_server:
-            print(f"Configuring proxy at {MAGENTA}{proxy_server}{NORMAL}...")
-            browser_args.append(f"--proxy-server={proxy_server}")
-        browser = await zd.start(user_data_dir=directory, browser_args=browser_args)
-
-        page = await browser.get("about:blank")
-        if proxy_username or proxy_password:
-            print("Setting up proxy authentication...")
-            await setup_proxy(proxy_username or "", proxy_password or "", page)
-
-        denylist = collect("denylist.txt")
-
-        async def handle_request(event):
-            resource_type = event.resource_type
-            request_url = event.request.url
-
-            deny_type = resource_type in [
-                zd.cdp.network.ResourceType.MEDIA,
-                zd.cdp.network.ResourceType.FONT,
-            ]
-            deny_url = any(domain in request_url for domain in denylist)
-            should_deny = deny_type or deny_url
-
-            if not should_deny:
-                try:
-                    await page.send(zd.cdp.fetch.continue_request(request_id=event.request_id))
-                except ProtocolException as e:
-                    if "Invalid state for continueInterceptedRequest" in str(e):
-                        pass  # Request already processed, ignore
-                    else:
-                        raise
-                return
-
-            if MIDDLEMAN_DEBUG:
-                print(f"{CROSS}{RED} DENY{NORMAL} {request_url}")
-
-            try:
-                await page.send(
-                    zd.cdp.fetch.fail_request(
-                        request_id=event.request_id, error_reason=zd.cdp.network.ErrorReason.BLOCKED_BY_CLIENT
-                    )
-                )
-            except ProtocolException as e:
-                if "Invalid state for continueInterceptedRequest" in str(e):
-                    pass  # Request already processed, ignore
-                else:
-                    raise
-
-        page.add_handler(zd.cdp.fetch.RequestPaused, handle_request)
-
-        return Handle(id=id, hostname=hostname, location=location, browser=browser, page=page)
-    except Exception as e:
-        print(f"{CROSS}{RED} Fatal ERROR: {e}{NORMAL}")
-        if browser:
-            await browser.stop()
-        raise
+    return id, hostname, browser, page
 
 
 @dataclass
@@ -640,6 +583,17 @@ def render(content: str, options: dict[str, str] | None = None) -> str:
 browsers: list[Handle] = []
 
 
+async def finalize(id: str):
+    handle = next((b for b in browsers if b.id == id), None)
+    if handle:
+        browsers[:] = [b for b in browsers if b.id != id]
+        try:
+            await handle.page.close()
+            print(f"Page {id} is terminated.")
+        except Exception as e:
+            print(f"Warning: Could not close page cleanly for {id}: {e}")
+
+
 app = FastAPI()
 
 
@@ -697,22 +651,11 @@ async def start(location: str):
 
     hostname = urllib.parse.urlparse(location).hostname or ""
 
-    handle = await init(location, hostname)
-    id = handle.id
-    page = handle.page
-
-    print(f"{GREEN}{ARROW} Browser launched with generated id: {BOLD}{id}{NORMAL}")
-    browsers.append(handle)
+    print(f"{GREEN}{ARROW} Launching browser for {BOLD}{location}{NORMAL}")
+    id, hostname, browser, page = await init(location, hostname)
 
     if MIDDLEMAN_PAUSE:
         await pause()
-
-    try:
-        print(f"{GREEN}{ARROW} Navigating to {NORMAL}{location}")
-        await page.get(location)
-    except Exception as e:
-        print(f"{RED}Error navigating to {location}: {e}{NORMAL}")
-        raise HTTPException(status_code=500, detail=f"Navigation failed: {str(e)}")
 
     # Since the browser can't redirect from GET to POST,
     # we'll use an auto-submit form to do that.
@@ -735,7 +678,6 @@ async def link(id: str, request: Request):
         raise HTTPException(status_code=404, detail=f"Invalid id: {id}")
 
     hostname = handle.hostname
-    browser = handle.browser
     page = handle.page
 
     patterns = load_patterns()
@@ -777,10 +719,8 @@ async def link(id: str, request: Request):
         action = f"/link/{id}"
 
         if await terminate(distilled):
-            print(f"{GREEN}{CHECK} Finished!{NORMAL}")
+            await finalize(id)
             converted = await convert(distilled)
-            await browser.stop()
-            browsers[:] = [b for b in browsers if b.id != id]
             if converted:
                 return JSONResponse(converted)
             return HTMLResponse(render(str(document.find("body")), {"title": title, "action": action}))
@@ -872,21 +812,13 @@ async def distill_command(location: str, option: str | None = None):
 
     print(f"Distilling {location}")
 
-    browser = await zd.start()
-    if location.startswith("http"):
-        hostname = urllib.parse.urlparse(location).hostname
-        if MIDDLEMAN_PAUSE:
-            await pause()
-        page: zd.Tab = await browser.get(location)
-        await page
-    else:
-        hostname = option or ""
-        page: zd.Tab = await browser.get("about:blank")
-        # TODO: zendriver Tab doesn't have set_content method to load local HTML
-        # with open(location, "r", encoding="utf-8") as f:
-        #     content = f.read()
-        #     await page.set_content(content)
-        await page
+    if not location.startswith("http"):
+        location = f"https://{location}"
+
+    hostname = urllib.parse.urlparse(location).hostname or ""
+
+    print(f"Starting browser for {location}...")
+    id, hostname, browser, page = await init(location, hostname)
 
     match = await distill(hostname, page, patterns)
 
@@ -905,7 +837,7 @@ async def distill_command(location: str, option: str | None = None):
 
     if MIDDLEMAN_PAUSE:
         await pause()
-    await browser.stop()
+    await finalize(id)
 
 
 async def run_command(location: str):
@@ -915,15 +847,8 @@ async def run_command(location: str):
     hostname = urllib.parse.urlparse(location).hostname or ""
     patterns = load_patterns()
 
-    browser_data = await init(location, hostname)
-    browser_id = browser_data.id
-    browser = browser_data.browser
-
-    print(f"Starting browser {browser_id}")
-
-    print(f"{GREEN}{ARROW} Navigating to {NORMAL}{location}")
-    page = await browser.get(location)
-    await page
+    print(f"Starting browser for {location}...")
+    id, hostname, browser, page = await init(location, hostname)
 
     TICK = 1  # seconds
     TIMEOUT = 15  # seconds
@@ -939,8 +864,8 @@ async def run_command(location: str):
 
             match = await distill(hostname, page, patterns)
 
-            # if MIDDLEMAN_PAUSE:
-            #     await pause()
+            if MIDDLEMAN_PAUSE:
+                await pause()
 
             if match:
                 if match.distilled == current["distilled"]:
@@ -965,25 +890,11 @@ async def run_command(location: str):
             else:
                 print(f"{CROSS}{RED} No matched pattern found{NORMAL}")
 
-        print()
-        print(f"Terminating browser {browser_id}")
-
         if MIDDLEMAN_PAUSE:
             await pause()
 
     finally:
-        await browser.stop()
-        print("Terminated.")
-
-
-async def inspect_command(browser_id: str, option: str | None = None):
-    directory = f"user-data-dir/{browser_id}"
-    browser = await zd.start(user_data_dir=directory)
-    page = await browser.get()
-    if option and len(option) > 0:
-        url = option if option.startswith("http") else f"https://{option}"
-        await page.get(url)
-    await pause()
+        await finalize(id)
 
 
 async def main():
@@ -1002,10 +913,6 @@ async def main():
     run_parser = subparsers.add_parser("run", help="Run automation")
     run_parser.add_argument("parameter", help="URL or domain")
 
-    inspect_parser = subparsers.add_parser("inspect", help="Inspect browser session")
-    inspect_parser.add_argument("parameter", help="Browser ID")
-    inspect_parser.add_argument("option", nargs="?", help="URL to navigate to")
-
     subparsers.add_parser("server", help="Start web server")
 
     args = parser.parse_args()
@@ -1016,15 +923,32 @@ async def main():
         await distill_command(args.parameter, args.option)
     elif args.command == "run":
         await run_command(args.parameter)
-    elif args.command == "inspect":
-        await inspect_command(args.parameter, args.option)
     elif args.command == "server":
         return "server"
     else:
         parser.print_help()
 
 
+async def check_cdp() -> bool:
+    """Check for the availability of remote Chrome with active CDP"""
+    try:
+        print(f"{ARROW} Checking for remote Chrome with CDP at {CYAN}{CDP_URL}{NORMAL}...")
+        cdp = urllib.parse.urlparse(CDP_URL)
+        with urllib.request.urlopen(f"{cdp.scheme}://{cdp.hostname}:{cdp.port}/json") as response:
+            data = json.loads(response.read().decode())
+            result = isinstance(data, list) and len(data) > 0
+            if result:
+                print(f"{CHECK} CDP is detected.")
+            return result
+    except Exception:
+        return False
+
+
 if __name__ == "__main__":
+    if asyncio.run(check_cdp()) is False:
+        print("Fatal error: Unable to detect remote Chrome with CDP!")
+        sys.exit(-1)
+
     result = asyncio.run(main())
     if result == "server":
         port = int(os.getenv("PORT", 3000))

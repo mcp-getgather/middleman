@@ -14,15 +14,22 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - run: docker build -t middleman .
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
 
-      - run: docker run -p 3000:3000 --name middleman -d middleman
+      - run: docker run --name cdp -p 9222:9222 -d ghcr.io/mcp-getgather/chromium-live
         timeout-minutes: 3
+
+      - name: Wait for Chrome CDP to be ready
+        run: while ! curl -s 'http://127.0.0.1:9222/json/version' | grep -q 'Chrome'; do sleep 1; done
+        timeout-minutes: 2
+
+      - run: uv run middleman.py &
 
       - name: Run the health check validation
         run: while ! curl -s 'http://localhost:3000/health' | grep 'OK'; do sleep 1; done
         timeout-minutes: 3
 
       - name: Get the container logs
-        run: docker logs --details middleman
+        run: docker logs --details cdp
         if: always()

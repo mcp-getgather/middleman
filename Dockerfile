@@ -21,8 +21,6 @@ RUN apt-get update -y && apt-get install -y --no-install-recommends \
     jwm \
     x11-apps \
     xterm \
-    novnc \
-    websockify \
     && rm -rf /var/lib/apt/lists/*
 
 ENV PYTHONUNBUFFERED=1
@@ -46,10 +44,6 @@ RUN uv sync --no-dev
 ENV PATH="/app/.venv/bin:$PATH"
 
 EXPOSE 3000
-
-RUN cp /usr/share/novnc/vnc_lite.html /usr/share/novnc/index.html
-RUN sed -i 's/rfb.scaleViewport = readQueryVariable.*$/rfb.scaleViewport = true;/' /usr/share/novnc/index.html
-EXPOSE 3001
 
 RUN useradd -m -s /bin/bash middleman && \
     chown -R middleman:middleman /app && \
